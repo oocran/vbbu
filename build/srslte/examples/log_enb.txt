@@ -1,8 +1,0 @@
-eNodeB log control
-==================
-
-iFFT object created successfully (OFDM Tx)
-PBCH created successfully
-PCFICH created successfully
-PDCCH created successfully
-PDSCH created successfully
