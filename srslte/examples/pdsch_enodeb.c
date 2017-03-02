@@ -48,6 +48,7 @@ srslte_rf_t rf;
 #endif
 
 char *output_file_name = NULL;
+char *input_file_name = NULL;
 
 #define LEFT_KEY  68
 #define RIGHT_KEY 67
@@ -75,6 +76,8 @@ float rf_amp = 0.8, rf_gain = 70.0, rf_freq = 2400000000;
 
 bool null_file_sink=false; 
 srslte_filesink_t fsink;
+srslte_filesource_t fsource; //input data file
+srslte_filesink_t logsink; //log control
 srslte_ofdm_t ifft;
 srslte_pbch_t pbch;
 srslte_pcfich_t pcfich;
@@ -109,6 +112,7 @@ void usage(char *prog) {
 #else
   printf("\t   RF is disabled.\n");
 #endif
+  printf("\t-i input_file [Default 'Random bits']\n");
   printf("\t-o output_file [Default use RF board]\n");
   printf("\t-m MCS index [Default %d]\n", mcs_idx);
   printf("\t-n number of frames [Default %d]\n", nof_frames);
@@ -120,7 +124,7 @@ void usage(char *prog) {
 
 void parse_args(int argc, char **argv) {
   int opt;
-  while ((opt = getopt(argc, argv, "aglfmoncpvu")) != -1) {
+  while ((opt = getopt(argc, argv, "aglfmoncpvui")) != -1) {
     switch (opt) {
     case 'a':
       rf_args = argv[optind];
@@ -133,6 +137,9 @@ void parse_args(int argc, char **argv) {
       break;
     case 'f':
       rf_freq = atof(argv[optind]);
+      break;
+    case 'i':
+      input_file_name = argv[optind];
       break;
     case 'o':
       output_file_name = argv[optind];
@@ -205,6 +212,23 @@ void base_init() {
 #endif
   }
   
+  /* input data file */
+  if (input_file_name) {
+      if (strcmp(input_file_name, "NULL")) {
+        if (srslte_filesource_init(&fsource, input_file_name, SRSLTE_CHAR)) {
+          fprintf(stderr, "Error opening file %s\n", input_file_name);
+          exit(-1);
+        }
+    }
+  }
+
+  /* open log file */
+  if (srslte_filesink_init(&logsink, "log_enb.txt", SRSLTE_CHAR)) {
+	  fprintf(stderr, "Error opening log file %s\n", "log_enb.txt");
+	  exit(-1);
+  }
+  fprintf(logsink.f,"%s","eNodeB log control\n==================\n\n");
+
   if (net_port > 0) {
     if (srslte_netsource_init(&net_source, "0.0.0.0", net_port, SRSLTE_NETSOURCE_TCP)) {
       fprintf(stderr, "Error creating input UDP socket at port %d\n", net_port);
@@ -220,6 +244,7 @@ void base_init() {
       perror("sem_init");
       exit(-1);
     }
+    fprintf(logsink.f,"%s","Sockets init successful\n");
   }
 
   /* create ifft object */
@@ -228,42 +253,54 @@ void base_init() {
     exit(-1);
   }
   srslte_ofdm_set_normalize(&ifft, true);
+  fprintf(logsink.f,"%s","iFFT object created successfully (OFDM Tx)\n");
+
   if (srslte_pbch_init(&pbch, cell)) {
     fprintf(stderr, "Error creating PBCH object\n");
     exit(-1);
   }
+  fprintf(logsink.f,"%s","PBCH created successfully\n");
 
   if (srslte_regs_init(&regs, cell)) {
     fprintf(stderr, "Error initiating regs\n");
     exit(-1);
   }
+  fprintf(logsink.f,"%s","Regs init successful\n");
 
   if (srslte_pcfich_init(&pcfich, &regs, cell)) {
-    fprintf(stderr, "Error creating PBCH object\n");
+    fprintf(stderr, "Error creating PCFICH object\n");
     exit(-1);
   }
+  fprintf(logsink.f,"%s","PCFICH created successfully\n");
 
   if (srslte_regs_set_cfi(&regs, cfi)) {
     fprintf(stderr, "Error setting CFI\n");
     exit(-1);
   }
+  fprintf(logsink.f,"%s","CFI set successfully\n");
 
   if (srslte_pdcch_init(&pdcch, &regs, cell)) {
     fprintf(stderr, "Error creating PDCCH object\n");
     exit(-1);
   }
+  fprintf(logsink.f,"%s","PDCCH created successfully\n");
 
   if (srslte_pdsch_init(&pdsch, cell)) {
     fprintf(stderr, "Error creating PDSCH object\n");
     exit(-1);
   }
+  fprintf(logsink.f,"%s","PDSCH created successfully\n");
   
   srslte_pdsch_set_rnti(&pdsch, UE_CRNTI);
+  fprintf(logsink.f,"%s","CRNTI set successfully\n");
   
   if (srslte_softbuffer_tx_init(&softbuffer, cell.nof_prb)) {
     fprintf(stderr, "Error initiating soft buffer\n");
     exit(-1);
   }
+  fprintf(logsink.f,"%s","Soft buffer init successful\n");
+  fprintf(logsink.f,"%s","Base init successful\n");
+  fprintf(logsink.f,"%s","--------------------\n");
 }
 
 void base_free() {
@@ -296,6 +333,14 @@ void base_free() {
     srslte_netsource_free(&net_source);
     sem_close(&net_sem);
   }  
+
+  /* free log file */
+  srslte_filesink_free(&logsink);
+
+  /* free input data file */
+  if (input_file_name) {
+      srslte_filesource_free(&fsource);
+  }
 }
 
 
@@ -309,7 +354,6 @@ void sig_int_handler(int signo)
 }
 
 
-
 unsigned int
 reverse(register unsigned int x)
 {
@@ -318,7 +362,6 @@ reverse(register unsigned int x)
     x = (((x & 0xf0f0f0f0) >> 4) | ((x & 0x0f0f0f0f) << 4));
     x = (((x & 0xff00ff00) >> 8) | ((x & 0x00ff00ff) << 8));
     return((x >> 16) | (x << 16));
-
 }
 
 uint32_t prbset_to_bitmask() {
@@ -450,8 +493,30 @@ void *net_thread_fnc(void *arg) {
   return NULL;
 }
 
+//auxiliary function. Char to binary conversion for optimized payload
+int char2bin(char *input, uint8_t *output, int len){
+
+	int i, j, l = 0;
+
+	//printf("\nlen=%d, char=%c",len,input[0]);
+	for (j = 0; j < len; j++) {
+			/* do here your DSP work */
+			//printf("%c", input[j]);
+			for(i=7;i>=0;i--){
+				output[l]=((input[j] & (1 << i)) ? 1 : 0);
+				//int bit=output[l];
+				//printf("%i", bit);
+				l++;
+			}
+			//printf("\n");
+		}
+
+	return l;
+}
+
 int main(int argc, char **argv) {
   int nf=0, sf_idx=0, N_id_2=0;
+  int result = 0;
   cf_t pss_signal[SRSLTE_PSS_LEN];
   float sss_signal0[SRSLTE_SSS_LEN]; // for subframe 0
   float sss_signal5[SRSLTE_SSS_LEN]; // for subframe 5
@@ -463,6 +528,10 @@ int main(int argc, char **argv) {
   srslte_dci_location_t locations[SRSLTE_NSUBFRAMES_X_FRAME][30];
   uint32_t sfn; 
   srslte_chest_dl_t est; 
+
+  /* file vars */
+  char data_file_txt[10000];
+  uint8_t data_abc[80000];
   
 #ifdef DISABLE_RF
   if (argc < 3) {
@@ -487,15 +556,27 @@ int main(int argc, char **argv) {
   /* this *must* be called after setting slot_len_* */
   base_init();
 
+  fprintf(logsink.f,"%s","CELL PARAMETERS\n");
+  fprintf(logsink.f,"Cell id: %d\n", cell.id);
+  fprintf(logsink.f,"#PRBs: %d\n", cell.nof_prb);
+  fprintf(logsink.f,"%s","--------------------\n");
+
   /* Generate PSS/SSS signals */
-  srslte_pss_generate(pss_signal, N_id_2);
+  if (srslte_pss_generate(pss_signal, N_id_2)) {
+    fprintf(stderr, "Error generating PSS signal\n");
+    exit(-1);
+  }
+  fprintf(logsink.f,"PSS signal generated successfully\n");
+
   srslte_sss_generate(sss_signal0, sss_signal5, cell.id);
+  fprintf(logsink.f,"SSS signals generated successfully\n");
   
   /* Generate CRS signals */
   if (srslte_chest_dl_init(&est, cell)) {
     fprintf(stderr, "Error initializing equalizer\n");
     exit(-1);
   }
+  fprintf(logsink.f,"Channel equalizer init successful\n");
 
   for (i = 0; i < SRSLTE_MAX_PORTS; i++) { // now there's only 1 port
     sf_symbols[i] = sf_buffer;
@@ -503,7 +584,6 @@ int main(int argc, char **argv) {
   }
 
 #ifndef DISABLE_RF
-
 
   sigset_t sigset;
   sigemptyset(&sigset);
@@ -514,18 +594,20 @@ int main(int argc, char **argv) {
   if (!output_file_name) {
     
     int srate = srslte_sampling_freq_hz(cell.nof_prb);    
+    //printf("%d\n", srate);
     if (srate != -1) {  
-      if (srate < 10e6) {          
-        srslte_rf_set_master_clock_rate(&rf, 4*srate);        
+      /*if (srate < 10e6) {
+        srslte_rf_set_master_clock_rate(&rf, 40*srate);
       } else {
         srslte_rf_set_master_clock_rate(&rf, srate);        
-      }
+      }*/
       printf("Setting sampling rate %.2f MHz\n", (float) srate/1000000);
       float srate_rf = srslte_rf_set_tx_srate(&rf, (double) srate);
       if (srate_rf != srate) {
         fprintf(stderr, "Could not set sampling rate\n");
         exit(-1);
       }
+      fprintf(logsink.f, "Setting sampling rate %.2f MHz\n", (float) srate/1000000);
     } else {
       fprintf(stderr, "Invalid number of PRB %d\n", cell.nof_prb);
       exit(-1);
@@ -533,24 +615,27 @@ int main(int argc, char **argv) {
     printf("Set TX gain: %.1f dB\n", srslte_rf_set_tx_gain(&rf, rf_gain));
     printf("Set TX freq: %.2f MHz\n",
         srslte_rf_set_tx_freq(&rf, rf_freq) / 1000000);
+    fprintf(logsink.f, "Setting Tx gain: %.1f dB\n", rf_gain);
+    fprintf(logsink.f, "Setting Tx freq: %.2f MHz\n", (float) rf_freq / 1000000);
   }
 #endif
 
   if (update_radl(sf_idx)) {
     exit(-1);
   }
+  fprintf(logsink.f, "Updated DL resource allocation");
   
   if (net_port > 0) {
     if (pthread_create(&net_thread, NULL, net_thread_fnc, NULL)) {
       perror("pthread_create");
       exit(-1);
     }
+    fprintf(logsink.f, "Thread for UDP socket created");
   }
   
   /* Initiate valid DCI locations */
   for (i=0;i<SRSLTE_NSUBFRAMES_X_FRAME;i++) {
     srslte_pdcch_ue_locations(&pdcch, locations[i], 30, i, cfi, UE_CRNTI);
-    
   }
     
   nf = 0;
@@ -593,9 +678,12 @@ int main(int argc, char **argv) {
           INFO("Transmitting packet\n",0);
         }
       } else {
-        INFO("SF: %d, Generating %d random bits\n", sf_idx, pdsch_cfg.grant.mcs.tbs);
-        for (i=0;i<pdsch_cfg.grant.mcs.tbs/8;i++) {
-          data[i] = rand()%256;
+	  if (!input_file_name) {
+	    /* generate random sequence if no input data file is specified */		
+            INFO("SF: %d, Generating %d random bits\n", sf_idx, pdsch_cfg.grant.mcs.tbs);
+            for (i=0;i<pdsch_cfg.grant.mcs.tbs/8;i++) {
+            data[i] = rand()%256;
+	  }
         }
         /* Uncomment this to transmit on sf 0 and 5 only  */
         if (sf_idx != 0 && sf_idx != 5) {
@@ -622,7 +710,23 @@ int main(int argc, char **argv) {
           fprintf(stderr, "Error configuring PDSCH\n");
           exit(-1);
         }
-       
+        
+		/* use data file if required */
+		if (input_file_name) {
+		  srslte_filesource_read(&fsource,data_file_txt,pdsch_cfg.grant.mcs.tbs/8);
+
+		  result=char2bin(data_file_txt,data_abc,pdsch_cfg.grant.mcs.tbs/8);
+		  //printf("\n%d re:%d\n",pdsch_cfg.grant.mcs.tbs/8,result);
+		  if(result==pdsch_cfg.grant.mcs.tbs){
+			  //printf("result IGUAL a pdsch_cfg.grant.mcs.tbs");
+			  for(i=0;i<pdsch_cfg.grant.mcs.tbs;i++) {
+				  data[i] = data_abc[i];
+			  }
+		  }else{
+			  printf("result diferente a pdsch_cfg.grant.mcs.tbs");
+		  }
+		}
+
         /* Encode PDSCH */
         if (srslte_pdsch_encode(&pdsch, &pdsch_cfg, &softbuffer, data, sf_symbols)) {
           fprintf(stderr, "Error encoding PDSCH\n");

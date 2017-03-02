@@ -272,6 +272,12 @@ int rf_uhd_open(char *args, void **h)
         handler->dynamic_rate = false; 
         handler->devname = DEVNAME_X300;
       }
+      //added n210
+      else if (find_string(devices_str, "type=usrp2") || find_string(devices_str, "type=n210")) {
+              args = "type=n210,master_clock_rate=30.72e6";
+              handler->dynamic_rate = false;
+              handler->devname = DEVNAME_N210;
+            }
     } else {
       // If args is set and x300 type is specified, make sure master_clock_rate is defined
       if (strstr(args, "type=x300") && !strstr(args, "master_clock_rate")) {

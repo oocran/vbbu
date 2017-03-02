@@ -32,6 +32,8 @@
 
 #define DEVNAME_B200 "uhd_b200"
 #define DEVNAME_X300 "uhd_x300"
+//N210
+#define DEVNAME_N210 "uhd_n210"
 
 
 SRSLTE_API int rf_uhd_open(char *args, 

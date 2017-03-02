@@ -34,7 +34,8 @@ typedef enum {
   SRSLTE_COMPLEX_SHORT, 
   SRSLTE_FLOAT_BIN, 
   SRSLTE_COMPLEX_FLOAT_BIN, 
-  SRSLTE_COMPLEX_SHORT_BIN  
+  SRSLTE_COMPLEX_SHORT_BIN,
+  SRSLTE_CHAR //add char case
 } srslte_datatype_t;
 
 #endif // FORMAT_

@@ -75,6 +75,7 @@ int srslte_filesource_read(srslte_filesource_t *q, void *buffer, int nsamples) {
   float *fbuf = (float*) buffer;
   _Complex float *cbuf = (_Complex float*) buffer;
   _Complex short *sbuf = (_Complex short*) buffer;
+  char *charbuf = (char*) buffer; //add char case
   int size;
 
   switch(q->type) {
@@ -108,6 +109,13 @@ int srslte_filesource_read(srslte_filesource_t *q, void *buffer, int nsamples) {
       size = sizeof(_Complex short);
     }
     return fread(buffer, size, nsamples, q->f);
+    break;
+  //add char case, also in format.h
+  case SRSLTE_CHAR:
+    for (i=0;i<nsamples;i++) {
+      if (EOF == fscanf(q->f,"%c",&charbuf[i]))
+        break;
+    }
     break;
   default:
     i = -1;

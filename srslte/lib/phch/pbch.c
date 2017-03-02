@@ -152,17 +152,21 @@ int srslte_pbch_init(srslte_pbch_t *q, srslte_cell_t cell) {
     q->nof_symbols = (SRSLTE_CP_ISNORM(q->cell.cp)) ? PBCH_RE_CP_NORM : PBCH_RE_CP_EXT;
     
     if (srslte_modem_table_lte(&q->mod, SRSLTE_MOD_QPSK)) {
+      fprintf(stderr, "Error in creating modem table\n");
       goto clean;
     }
     if (srslte_sequence_pbch(&q->seq, q->cell.cp, q->cell.id)) {
+      fprintf(stderr, "Error in creating PBCH sequence\n");
       goto clean;
     }
 
     int poly[3] = { 0x6D, 0x4F, 0x57 };
     if (srslte_viterbi_init(&q->decoder, SRSLTE_VITERBI_37, poly, 40, true)) {
+      fprintf(stderr, "Error applying Viterbi algorithm\n");
       goto clean;
     }
     if (srslte_crc_init(&q->crc, SRSLTE_LTE_CRC16, 16)) {
+      fprintf(stderr, "Error in creating redundancy\n");
       goto clean;
     }
     q->encoder.K = 7;
@@ -172,33 +176,40 @@ int srslte_pbch_init(srslte_pbch_t *q, srslte_cell_t cell) {
 
     q->d = srslte_vec_malloc(sizeof(cf_t) * q->nof_symbols);
     if (!q->d) {
+      fprintf(stderr, "Error in buffer allocation (d)\n");
       goto clean;
     }
     int i;
     for (i = 0; i < q->cell.nof_ports; i++) {
       q->ce[i] = srslte_vec_malloc(sizeof(cf_t) * q->nof_symbols);
       if (!q->ce[i]) {
+    	fprintf(stderr, "Error in buffer allocation (ce)\n");
         goto clean;
       }
       q->x[i] = srslte_vec_malloc(sizeof(cf_t) * q->nof_symbols);
       if (!q->x[i]) {
+    	fprintf(stderr, "Error in buffer allocation (x)\n");
         goto clean;
       }
       q->symbols[i] = srslte_vec_malloc(sizeof(cf_t) * q->nof_symbols);
       if (!q->symbols[i]) {
+    	fprintf(stderr, "Error in buffer allocation (sym)\n");
         goto clean;
       }
     }
     q->llr = srslte_vec_malloc(sizeof(float) * q->nof_symbols * 4 * 2);
     if (!q->llr) {
+      fprintf(stderr, "Error in buffer allocation (llr)\n");
       goto clean;
     }
     q->temp = srslte_vec_malloc(sizeof(float) * q->nof_symbols * 4 * 2);
     if (!q->temp) {
+      fprintf(stderr, "Error in buffer allocation (temp)\n");
       goto clean;
     }
     q->rm_b = srslte_vec_malloc(sizeof(float) * q->nof_symbols * 4 * 2);
     if (!q->rm_b) {
+      fprintf(stderr, "Error in buffer allocation (rm_b)\n");
       goto clean;
     }
     ret = SRSLTE_SUCCESS;
@@ -425,6 +436,7 @@ int srslte_pbch_decode(srslte_pbch_t *q, cf_t *slot1_symbols, cf_t *ce_slot1[SRS
   {
     for (i=0;i<q->cell.nof_ports;i++) {
       if (ce_slot1[i] == NULL) {
+    	fprintf(stderr, "Invalid inputs in PBCH decode call\n");
         return SRSLTE_ERROR_INVALID_INPUTS;
       } 
     }
@@ -497,6 +509,7 @@ int srslte_pbch_decode(srslte_pbch_t *q, cf_t *slot1_symbols, cf_t *ce_slot1[SRS
                   memcpy(bch_payload, q->data, sizeof(uint8_t) * SRSLTE_BCH_PAYLOAD_LEN);      
                 }
                 INFO("Decoded PBCH: src=%d, dst=%d, nb=%d, sfn_offset=%d\n", src, dst, nb+1, (int) dst - src + q->frame_idx - 1);
+                printf("Decoded PBCH: src=%d, dst=%d, nb=%d, sfn_offset=%d\n", src, dst, nb+1, (int) dst - src + q->frame_idx - 1);
                 return 1; 
               }
             }

@@ -289,6 +289,7 @@ int main(int argc, char **argv) {
   uint8_t bch_payload[SRSLTE_BCH_PAYLOAD_LEN];
   int sfn_offset;
   float cfo = 0; 
+  srslte_filesink_t logsink; //log control
   
   parse_args(&prog_args, argc, argv);
 
@@ -308,6 +309,13 @@ int main(int argc, char **argv) {
     srslte_netsink_set_nonblocking(&net_sink_signal);
   }
   
+  /* open log file */
+  if (srslte_filesink_init(&logsink, "log_ue.txt", SRSLTE_CHAR)) {
+	  fprintf(stderr, "Error opening log file %s\n", "log_ue.txt");
+	  exit(-1);
+  }
+  fprintf(logsink.f,"%s","UE log control\n==================\n\n");
+
 #ifndef DISABLE_RF
   if (!prog_args.input_file_name) {
     
@@ -316,15 +324,19 @@ int main(int argc, char **argv) {
       fprintf(stderr, "Error opening rf\n");
       exit(-1);
     }
+    fprintf(logsink.f,"%s","RF device opened successfully\n");
+
     /* Set receiver gain */
     if (prog_args.rf_gain > 0) {
-      srslte_rf_set_rx_gain(&rf, prog_args.rf_gain);      
+      srslte_rf_set_rx_gain(&rf, prog_args.rf_gain);
+      fprintf(logsink.f,"%s","Rx gain set successfully\n");
     } else {
       printf("Starting AGC thread...\n");
       if (srslte_rf_start_gain_thread(&rf, false)) {
         fprintf(stderr, "Error opening rf\n");
         exit(-1);
       }
+      fprintf(logsink.f,"%s","AGC thread started\n");
       srslte_rf_set_rx_gain(&rf, 50);      
       cell_detect_config.init_agc = 50; 
     }
@@ -342,6 +354,7 @@ int main(int argc, char **argv) {
     srslte_rf_set_rx_freq(&rf, prog_args.rf_freq);
     srslte_rf_rx_wait_lo_locked(&rf);
 
+    fprintf(logsink.f,"%s","Scanning for cells...\n");
     uint32_t ntrial=0; 
     do {
       ret = rf_search_and_decode_mib(&rf, &cell_detect_config, prog_args.force_N_id_2, &cell, &cfo);
@@ -356,20 +369,24 @@ int main(int argc, char **argv) {
     if (go_exit) {
       exit(0);
     }
+    fprintf(logsink.f,"Cell with %s PRBs found!", cell.nof_prb);
+
     /* set sampling frequency */
     int srate = srslte_sampling_freq_hz(cell.nof_prb);    
+    //printf("%d\n", srate);
     if (srate != -1) {  
-      if (srate < 10e6) {          
+      /*if (srate < 10e6) {
         srslte_rf_set_master_clock_rate(&rf, 4*srate);        
       } else {
         srslte_rf_set_master_clock_rate(&rf, srate);        
-      }
+      }*/
       printf("Setting sampling rate %.2f MHz\n", (float) srate/1000000);
       float srate_rf = srslte_rf_set_rx_srate(&rf, (double) srate);
       if (srate_rf != srate) {
         fprintf(stderr, "Could not set sampling rate\n");
         exit(-1);
       }
+      fprintf(logsink.f,"Setting sampling rate %.2f MHz\n", (float) srate/1000000);
     } else {
       fprintf(stderr, "Invalid number of PRB %d\n", cell.nof_prb);
       exit(-1);
@@ -403,21 +420,25 @@ int main(int argc, char **argv) {
       fprintf(stderr, "Error initiating ue_sync\n");
       exit(-1); 
     }
+    fprintf(logsink.f,"UE sync init successful");
 #endif
   }
 
   if (srslte_ue_mib_init(&ue_mib, cell)) {
     fprintf(stderr, "Error initaiting UE MIB decoder\n");
     exit(-1);
-  }    
+  }
+  fprintf(logsink.f,"MIB decoder init successful");
 
   if (srslte_ue_dl_init(&ue_dl, cell)) {  // This is the User RNTI
     fprintf(stderr, "Error initiating UE downlink processing module\n");
     exit(-1);
   }
+  fprintf(logsink.f,"DL init successful");
   
   /* Configure downlink receiver for the SI-RNTI since will be the only one we'll use */
   srslte_ue_dl_set_rnti(&ue_dl, prog_args.rnti); 
+  fprintf(logsink.f,"RNTI set successfully");
   
   /* Initialize subframe counter */
   sf_cnt = 0;

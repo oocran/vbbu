@@ -128,6 +128,7 @@ int srslte_ue_mib_decode(srslte_ue_mib_t * q, cf_t *input,
   /* Get channel estimates of sf idx #0 for each port */
   ret = srslte_chest_dl_estimate(&q->chest, q->sf_symbols, q->ce, 0);
   if (ret < 0) {
+	fprintf(stderr, "Error with channel estimates\n");
     return SRSLTE_ERROR;
   }
   /* Reset decoder if we missed a frame */
