@@ -121,7 +121,7 @@ int rf_mib_decoder(srslte_rf_t *rf, cell_search_cfg_t *config, srslte_cell_t *ce
     srslte_ue_sync_set_cfo(&ue_mib.ue_sync, *cfo);
   }
   
-  /* Find and decody MIB */
+  /* Find and decode MIB */
   ret = srslte_ue_mib_sync_decode(&ue_mib, config->max_frames_pbch, bch_payload, &cell->nof_ports, NULL); 
   if (ret < 0) {
     fprintf(stderr, "Error decoding MIB\n");
@@ -246,7 +246,7 @@ int rf_search_and_decode_mib(srslte_rf_t *rf, cell_search_cfg_t *config, int for
     if (ret < 0) {
       fprintf(stderr, "Could not decode PBCH from CELL ID %d\n", cell->id);
       return SRSLTE_ERROR;
-    }    
+    }
   }
   return ret;
 }

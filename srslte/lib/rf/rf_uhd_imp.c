@@ -274,7 +274,7 @@ int rf_uhd_open(char *args, void **h)
       }
       //added n210
       else if (find_string(devices_str, "type=usrp2") || find_string(devices_str, "type=n210")) {
-              args = "type=n210,master_clock_rate=30.72e6";
+              args = "type=usrp2,master_clock_rate=30.72e6";
               handler->dynamic_rate = false;
               handler->devname = DEVNAME_N210;
             }
@@ -355,6 +355,9 @@ int rf_uhd_open(char *args, void **h)
     uhd_rx_metadata_make(&handler->rx_md);
     uhd_rx_metadata_make(&handler->rx_md_first);
     uhd_tx_metadata_make(&handler->tx_md, false, 0, 0, false, false);
+
+    //prova
+    uhd_usrp_set_master_clock_rate(handler->usrp, 30.72e6*3, 0);
   
     return 0;
   } else {
@@ -387,7 +390,7 @@ int rf_uhd_close(void *h)
 void rf_uhd_set_master_clock_rate(void *h, double rate) {
   rf_uhd_handler_t *handler = (rf_uhd_handler_t*) h;
   if (handler->dynamic_rate) {
-    uhd_usrp_set_master_clock_rate(handler->usrp, rate, 0);
+    uhd_usrp_set_master_clock_rate(handler->usrp, 30.72e6*3, 0);
   }
 }
 

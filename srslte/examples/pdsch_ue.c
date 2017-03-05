@@ -347,7 +347,8 @@ int main(int argc, char **argv) {
     sigprocmask(SIG_UNBLOCK, &sigset, NULL);
     signal(SIGINT, sig_int_handler);
     
-    srslte_rf_set_master_clock_rate(&rf, 30.72e6);        
+    //canvi
+    //srslte_rf_set_master_clock_rate(&rf, 30.72e6*3);
 
     /* set receiver frequency */
     printf("Tunning receiver to %.3f MHz\n", prog_args.rf_freq/1000000);
@@ -365,12 +366,32 @@ int main(int argc, char **argv) {
         printf("Cell not found after %d trials. Trying again (Press Ctrl+C to exit)\n", ntrial++);
       }      
     } while (ret == 0 && !go_exit); 
-    
+
     if (go_exit) {
       exit(0);
     }
-    fprintf(logsink.f,"Cell with %s PRBs found!", cell.nof_prb);
 
+    printf("\n ret = %d\n", ret);
+
+    fprintf(logsink.f,"Cell with %d PRBs found!", cell.nof_prb);
+/*
+    printf("\n nof_prb = %d\n", cell.nof_prb);
+    printf("\n nof_ports = %d\n", cell.nof_ports);
+    printf("\n bw_idx = %d\n", cell.bw_idx);
+    printf("\n id = %d\n", cell.nof_prb);
+    printf("\n cp = %d\n", cell.cp);
+    printf("\n phich_length = %d\n", cell.phich_length);
+    printf("\n phich_resources = %d\n", cell.phich_resources);
+
+    //force default
+    cell.id = 0;
+    cell.cp = SRSLTE_CP_NORM;
+    cell.phich_length = SRSLTE_PHICH_NORM;
+    cell.phich_resources = SRSLTE_PHICH_R_1;
+    cell.nof_ports = 1;
+    cell.nof_prb = 6;
+    cell.bw_idx = 0;
+*/
     /* set sampling frequency */
     int srate = srslte_sampling_freq_hz(cell.nof_prb);    
     //printf("%d\n", srate);
@@ -502,7 +523,7 @@ int main(int argc, char **argv) {
             if (n < 0) {
               fprintf(stderr, "Error decoding UE MIB\n");
               exit(-1);
-            } else if (n == SRSLTE_UE_MIB_FOUND) {             
+            } else if (n == SRSLTE_UE_MIB_FOUND) {
               srslte_pbch_mib_unpack(bch_payload, &cell, &sfn);
               srslte_cell_fprint(stdout, &cell, sfn);
               printf("Decoded MIB. SFN: %d, offset: %d\n", sfn, sfn_offset);

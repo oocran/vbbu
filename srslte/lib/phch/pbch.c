@@ -510,7 +510,7 @@ int srslte_pbch_decode(srslte_pbch_t *q, cf_t *slot1_symbols, cf_t *ce_slot1[SRS
                 }
                 INFO("Decoded PBCH: src=%d, dst=%d, nb=%d, sfn_offset=%d\n", src, dst, nb+1, (int) dst - src + q->frame_idx - 1);
                 printf("Decoded PBCH: src=%d, dst=%d, nb=%d, sfn_offset=%d\n", src, dst, nb+1, (int) dst - src + q->frame_idx - 1);
-                return 1; 
+                return 1;
               }
             }
           }
