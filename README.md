@@ -2,7 +2,7 @@
 
 Virtual BBU for OOCRAN
 ===============
-LTE use case developed to act as a Proof-of-concept for the OOCRAN project. It is based on [srsLTE](https://github.com/srsLTE/srsLTE), a fully-compliant open-source LTE library.
+LTE use case developed to act as a Proof-of-concept for the OOCRAN project. It is based on [srsLTE](https://github.com/srsLTE/srsLTE), a fully-compliant open-source LTE library. Tested with a USRP N210 and UHD drivers.
 
 Features
 ========
