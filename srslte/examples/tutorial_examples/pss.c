@@ -48,7 +48,7 @@ void do_plots_sss(float *corr_m0, float *corr_m1);
 bool disable_plots = false; 
 int cell_id = -1;
 char *rf_args="";
-float rf_gain=40.0, rf_freq=-1.0;
+float rf_gain=30.0, rf_freq=-1.0;
 int nof_frames = -1;
 uint32_t fft_size=128;
 float threshold = 0.4; 
@@ -244,7 +244,9 @@ int main(int argc, char **argv) {
         int sss_idx = peak_idx-2*fft_size-(SRSLTE_CP_ISNORM(cp)?SRSLTE_CP_LEN(fft_size, SRSLTE_CP_NORM_LEN):SRSLTE_CP_LEN(fft_size, SRSLTE_CP_EXT_LEN));             
         if (sss_idx >= 0 && sss_idx < flen-fft_size) {
           srslte_sss_synch_m0m1_partial(&sss, &buffer[sss_idx], 3, NULL, &m0, &m0_value, &m1, &m1_value);
+
           if (srslte_sss_synch_N_id_1(&sss, m0, m1) != N_id_1) {
+
             sss_error2++;            
           }
           INFO("Partial N_id_1: %d\n", srslte_sss_synch_N_id_1(&sss, m0, m1));
@@ -258,6 +260,10 @@ int main(int argc, char **argv) {
             sss_error1++;     
           }
           INFO("Full N_id_1: %d\n", srslte_sss_synch_N_id_1(&sss, m0, m1));
+
+          N_id_1 = srslte_sss_synch_N_id_1(&sss, m0, m1);
+          printf("N_id_1 : %d\n", N_id_1);
+
         }
         
         // Estimate CP 
@@ -295,7 +301,7 @@ int main(int argc, char **argv) {
     
     frame_cnt++;
    
-    printf("[%5d]: Pos: %5d, PSR: %4.1f (~%4.1f) Pdet: %4.2f, "
+    /*printf("[%5d]: Pos: %5d, PSR: %4.1f (~%4.1f) Pdet: %4.2f, "
            "FA: %4.2f, CFO: %+4.1f kHz SSSmiss: %4.2f/%4.2f/%4.2f CPNorm: %.0f\%\r", 
            frame_cnt, 
            peak_idx, 
@@ -303,7 +309,7 @@ int main(int argc, char **argv) {
            (float) nof_det/frame_cnt, 
            (float) nof_nopeakdet/frame_cnt, mean_cfo*15, 
            (float) sss_error1/nof_det,(float) sss_error2/nof_det,(float) sss_error3/nof_det,
-           (float) cp_is_norm/nof_det * 100);
+           (float) cp_is_norm/nof_det * 100);*/
     
     if (SRSLTE_VERBOSE_ISINFO()) {
       printf("\n");
