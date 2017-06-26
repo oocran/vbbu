@@ -95,8 +95,7 @@ typedef struct {
   int net_port; 
   char *net_address; 
   int net_port_signal; 
-  char *net_address_signal;
-  bool influx_DB;
+  char *net_address_signal;   
   char *DB_name;
   char *DB_ip;
   char *DB_NVF;
@@ -129,7 +128,6 @@ void args_default(prog_args_t *args) {
   args->net_address = "127.0.0.1";
   args->net_port_signal = -1; 
   args->net_address_signal = "127.0.0.1";
-  args->influx_DB = false;
   args->DB_name = "oocran";
   args->DB_ip = "localhost";
   args->DB_NVF = "OOCRAN";
@@ -138,7 +136,7 @@ void args_default(prog_args_t *args) {
 }
 
 void usage(prog_args_t *args, char *prog) {
-  printf("Usage: %s [agpPoOcildDnruvEBNIRW] -f rx_frequency (in Hz) | -i input_file\n", prog);
+  printf("Usage: %s [agpPoOcildDnruvBNIRW] -f rx_frequency (in Hz) | -i input_file\n", prog);
 #ifndef DISABLE_RF
   printf("\t-a RF args [Default %s]\n", args->rf_args);
 #ifdef ENABLE_AGC_DEFAULT
@@ -173,7 +171,6 @@ void usage(prog_args_t *args, char *prog) {
   printf("\t-v [set srslte_verbose to debug, default none]\n");
   printf("\t===============================\n");
   printf("\tinfluxDB settings:\n");
-  printf("\t-E Enable monitoring and configuration [Default %s]\n", args->influx_DB?"Enabled":"Disabled");
   printf("\t-B Database [Default %s]\n", args->DB_name);
   printf("\t-N NVF [Default %s]\n", args->DB_NVF);
   printf("\t-I IP address [Default %s]\n", args->DB_ip);
@@ -184,7 +181,7 @@ void usage(prog_args_t *args, char *prog) {
 void parse_args(prog_args_t *args, int argc, char **argv) {
   int opt;
   args_default(args);
-  while ((opt = getopt(argc, argv, "aogliIpPcOCtdDnNvrRfuUsSEBW")) != -1) {
+  while ((opt = getopt(argc, argv, "aogliIpPcOCtdDnNvrRfuUsSBW")) != -1) {
     switch (opt) {
     case 'i':
       args->input_file_name = argv[optind];
@@ -246,28 +243,20 @@ void parse_args(prog_args_t *args, int argc, char **argv) {
     case 'D':
       args->disable_plots_except_constellation = true;
       break;
-    case 'E':
-      args->influx_DB = true;
-      break;
     case 'B':
       args->DB_name = argv[optind];
-      args->influx_DB = true;
       break;
     case 'N':
       args->DB_NVF = argv[optind];
-      args->influx_DB = true;
       break;
     case 'I':
       args->DB_ip = argv[optind];
-      args->influx_DB = true;
       break;
     case 'R':
       args->DB_user = argv[optind];
-      args->influx_DB = true;
       break;
     case 'W':
       args->DB_pwd = argv[optind];
-      args->influx_DB = true;
       break;
     case 'v':
       srslte_verbose++;
@@ -341,25 +330,23 @@ int main(int argc, char **argv) {
   uint32_t default_iterations = 4;
   //uint32_t default_iterations = SRSLTE_PDSCH_MAX_TDEC_ITERS;
 
-  //parse arguments
+  Py_Initialize();
+  py_main = PyImport_AddModule("__main__");
+  PyRun_SimpleString("import requests");
+  PyRun_SimpleString("import sys");
+  PyRun_SimpleString("import psutil");
+
+
+  //PyRun_SimpleString("tc_iterations = str(4)");
+  //PyRun_SimpleString("default_iterations = str(4)");
+  
   parse_args(&prog_args, argc, argv);
 
-  if (prog_args.influx_DB) {
-
-	  //initialize Python environment
-	  Py_Initialize();
-	  py_main = PyImport_AddModule("__main__");
-	  PyRun_SimpleString("import requests");
-	  PyRun_SimpleString("import sys");
-	  PyRun_SimpleString("import psutil");
-
-	  //influxDB credentials
-	  PyModule_AddStringConstant(py_main, "NVF", prog_args.DB_NVF);
-	  PyModule_AddStringConstant(py_main, "IP", prog_args.DB_ip);
-	  PyModule_AddStringConstant(py_main, "DB", prog_args.DB_name);
-	  PyModule_AddStringConstant(py_main, "USER", prog_args.DB_user);
-	  PyModule_AddStringConstant(py_main, "PASSWORD", prog_args.DB_pwd);
-  }
+  PyModule_AddStringConstant(py_main, "NVF", prog_args.DB_NVF);
+  PyModule_AddStringConstant(py_main, "IP", prog_args.DB_ip);
+  PyModule_AddStringConstant(py_main, "DB", prog_args.DB_name);
+  PyModule_AddStringConstant(py_main, "USER", prog_args.DB_user);
+  PyModule_AddStringConstant(py_main, "PASSWORD", prog_args.DB_pwd);
 
   if (prog_args.net_port > 0) {
     if (srslte_netsink_init(&net_sink, prog_args.net_address, prog_args.net_port, SRSLTE_NETSINK_TCP)) {
@@ -415,6 +402,7 @@ int main(int argc, char **argv) {
     sigprocmask(SIG_UNBLOCK, &sigset, NULL);
     signal(SIGINT, sig_int_handler);
     
+    //canvi
     //srslte_rf_set_master_clock_rate(&rf, 30.72e6*3);
 
     /* set receiver frequency */
@@ -441,9 +429,7 @@ int main(int argc, char **argv) {
     printf("\n ret = %d\n", ret);
 
     fprintf(logsink.f,"Cell with %d PRBs found!", cell.nof_prb);
-
 /*
-
     printf("\n nof_prb = %d\n", cell.nof_prb);
     printf("\n nof_ports = %d\n", cell.nof_ports);
     printf("\n bw_idx = %d\n", cell.bw_idx);
@@ -573,23 +559,23 @@ int main(int argc, char **argv) {
   /* Main loop */
   while (!go_exit && (sf_cnt < prog_args.nof_subframes || prog_args.nof_subframes == -1)) {
 
-	if (prog_args.influx_DB) {
-		//reconfigure number of turbo code iterations
-		PyRun_SimpleString("with open('monitor.conf', 'r') as f: txt = f.readlines()");
-		PyRun_SimpleString("for line in txt:\n\t if 'iterations' in line:\n\t\t tc_iterations = int(line.split(" ")[-1]) \n\t\t break");
-		//PyRun_SimpleString("if default_iterations != tc_iterations and 1 <= int(tc_iterations) <= 10:\n\tprint 'Num of iterations needs to be changed to ' + tc_iterations\n\tdefault_iterations = tc_iterations");
-		//PyRun_SimpleString("tc_iterations = int(tc_iterations)");
-		py_handler = PyObject_GetAttrString(py_main,"tc_iterations");
-		tc_iterations = PyInt_AsLong(py_handler);
+    //reconfigure number of turbo code iterations
+    PyRun_SimpleString("with open('monitor.conf', 'r') as f: txt = f.readlines()");
+    PyRun_SimpleString("for line in txt:\n\t if 'iterations' in line:\n\t\t tc_iterations = int(line.split(" ")[-1]) \n\t\t break");
+    //PyRun_SimpleString("if default_iterations != tc_iterations and 1 <= int(tc_iterations) <= 10:\n\tprint 'Num of iterations needs to be changed to ' + tc_iterations\n\tdefault_iterations = tc_iterations");
+    //PyRun_SimpleString("tc_iterations = int(tc_iterations)");
+    py_handler = PyObject_GetAttrString(py_main,"tc_iterations");
+    tc_iterations = PyInt_AsLong(py_handler);
+    //printf("%d", tc_iterations);
 
-		if ((tc_iterations != default_iterations) && (tc_iterations >= 1) && (tc_iterations <= 10)) {
-			printf("\nRECONFIGURATION - The number of turbo code iterations will be changed to: %d \n", tc_iterations);
-			srslte_sch_set_max_noi(&ue_dl.pdsch.dl_sch, (uint32_t)tc_iterations);
-			//printf("\nMax iterations: %d", ue_dl.pdsch.dl_sch.max_iterations);
-			default_iterations = tc_iterations;
-		}
-		//printf("\nAverage number of iterations: %f \n", ue_dl.pdsch.dl_sch.average_nof_iterations);
-	}
+    if ((tc_iterations != default_iterations) && (tc_iterations >= 1) && (tc_iterations <= 10)) {
+	printf("\nRECONFIGURATION - The number of turbo code iterations will be changed to: %d", tc_iterations);
+	srslte_sch_set_max_noi(&ue_dl.pdsch.dl_sch, (uint32_t)tc_iterations);
+	printf("\nMax iterations: %d", ue_dl.pdsch.dl_sch.max_iterations);
+	default_iterations = tc_iterations;
+    }
+
+    //printf("\nAverage number of iterations: %f", ue_dl.pdsch.dl_sch.average_nof_iterations);
     
     ret = srslte_ue_sync_get_buffer(&ue_sync, &sf_buffer);
     if (ret < 0) {
@@ -699,35 +685,34 @@ int main(int argc, char **argv) {
       if (srslte_ue_sync_get_sfidx(&ue_sync) == 9) {
         sfn++; 
         if (sfn == 1024) {
+	  //write BLER in influxDB
+	  //sprintf(BLER_s, "%.1f", BLER); 
+	  //sprintf(BLER_s, "2.2"); 
+	  //PyModule_AddStringConstant(py_main, "BLERs", BLER_s);
+	  PyModule_AddIntConstant(py_main, "pkt_errors", ue_dl.pkt_errors);
+	  PyModule_AddIntConstant(py_main, "pkt_total", ue_dl.pkts_total);
+	  PyRun_SimpleString("BLERs = 100*float(float(pkt_errors)/float(pkt_total))");
+	  PyRun_SimpleString("BLER = 'BLER_' + NVF + ' value=%s' % BLERs");
+	  PyRun_SimpleString("cpu = 'cpu_' + NVF + ' value=%s' % psutil.cpu_percent()");
+    	  PyRun_SimpleString("disk = 'disk_' + NVF + ' value=%s' % psutil.disk_usage('/').percent");
+    	  PyRun_SimpleString("ram = 'ram_' + NVF + ' value=%s' % psutil.virtual_memory().used");
+	  PyRun_SimpleString("network_in = 'network_in_' + NVF + ' value=%s' % psutil.net_io_counters().bytes_sent");
+    	  PyRun_SimpleString("network_out = 'network_out_' + NVF + ' value=%s' % psutil.net_io_counters().bytes_recv");
+	  PyRun_SimpleString("iterations = 'iterations_' + NVF + ' value=%s' % tc_iterations");
+	  PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=BLER)");  
+	  PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=cpu)");  
+	  PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=disk)");  
+	  PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=ram)");  
+	  PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=network_in)");  
+	  PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=network_out)");
+	  PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=iterations)");    
 
-        	if (prog_args.influx_DB) {
-
-				//store BLER and computing resources in influxDB
-				PyModule_AddIntConstant(py_main, "pkt_errors", ue_dl.pkt_errors);
-				PyModule_AddIntConstant(py_main, "pkt_total", ue_dl.pkts_total);
-				PyRun_SimpleString("BLERs = 100*float(float(pkt_errors)/float(pkt_total))");
-				PyRun_SimpleString("BLER = 'BLER_' + NVF + ' value=%s' % BLERs");
-				PyRun_SimpleString("cpu = 'cpu_' + NVF + ' value=%s' % psutil.cpu_percent()");
-				PyRun_SimpleString("disk = 'disk_' + NVF + ' value=%s' % psutil.disk_usage('/').percent");
-				PyRun_SimpleString("ram = 'ram_' + NVF + ' value=%s' % psutil.virtual_memory().used");
-				//PyRun_SimpleString("network_in = 'network_in_' + NVF + ' value=%s' % psutil.net_io_counters().bytes_sent");
-				//PyRun_SimpleString("network_out = 'network_out_' + NVF + ' value=%s' % psutil.net_io_counters().bytes_recv");
-				PyRun_SimpleString("iterations = 'iterations_' + NVF + ' value=%s' % tc_iterations");
-				PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=BLER)");
-				PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=cpu)");
-				PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=disk)");
-				PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=ram)");
-				//PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=network_in)");
-				//PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=network_out)");
-				PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=iterations)");
-        	}
-
-        	sfn = 0;
-		    printf("\n");
-		    ue_dl.pkt_errors = 0;
-		    ue_dl.pkts_total = 0;
-		    ue_dl.nof_detected = 0;
-		    nof_trials = 0;
+          sfn = 0; 
+          printf("\n");
+          ue_dl.pkt_errors = 0; 
+          ue_dl.pkts_total = 0; 
+          ue_dl.nof_detected = 0;           
+          nof_trials = 0; 
         } 
       }
       

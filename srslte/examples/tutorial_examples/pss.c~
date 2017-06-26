@@ -212,7 +212,6 @@ int main(int argc, char **argv) {
   
   max_peak = 0;
   max_peak_position = -1;
-  peak_idx = -1;
 
   for (short pss_loop = 0; pss_loop < 3; pss_loop++) {
 	  if (srslte_pss_synch_set_N_id_2(&pss, pss_loop)) {

@@ -67,12 +67,3 @@ float power_avg(_Complex float *in, int length) {
 	aver_power=aver_power/(float)length;
 	return(aver_power);
 }
-
-void gen_noise_c(_Complex float *x, float variance, int len) {
-	int i;
-	for (i=0;i<len;i++) {
-		__real__ x[i] = rand_gauss();
-		__imag__ x[i] = rand_gauss();
-		x[i] *= variance;
-	}
-}

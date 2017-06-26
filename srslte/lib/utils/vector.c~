@@ -691,9 +691,31 @@ void srslte_vec_arg_cf(cf_t *x, float *arg, uint32_t len) {
 
 }
 
+/*
 uint32_t srslte_vec_max_fi(float *x, uint32_t len) {
 #ifdef HAVE_VOLK_MAX_FUNCTION
-  uint16_t target=0;  //changed from uint32
+  uint32_t target=0;
+  volk_32f_index_max_16u(&target,x,len);
+  return target;
+
+#else
+  uint32_t i;
+  float m=-FLT_MAX;
+  uint32_t p=0;
+  for (i=0;i<len;i++) {
+    if (x[i]>m) {
+      m=x[i];
+      p=i;
+    }
+  }
+  return p;
+#endif
+}
+*/
+
+uint32_t srslte_vec_max_fi(float *x, uint32_t len) {
+#ifdef HAVE_VOLK_MAX_FUNCTION
+  uint16_t target=0;
   volk_32f_index_max_16u(&target,x,len);
   return target;
 
@@ -747,7 +769,7 @@ void srslte_vec_max_fff(float *x, float *y, float *z, uint32_t len) {
 
 uint32_t srslte_vec_max_abs_ci(cf_t *x, uint32_t len) {
 #ifdef HAVE_VOLK_MAX_ABS_FUNCTION
-  uint16_t target=0; //changed from uint32
+  uint32_t target=0;
   volk_32fc_index_max_16u(&target,x,len);
   return target;
 

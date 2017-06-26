@@ -56,8 +56,4 @@ SRSLTE_API float srslte_ch_awgn_get_variance(float ebno_db,
 SRSLTE_API float power_avg(_Complex float *in,
 			   int length);
 
-SRSLTE_API void gen_noise_c(_Complex float *x,
-			    float variance,
-			    int len);
-
 #endif

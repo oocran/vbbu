@@ -33,6 +33,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <signal.h>
+#include <python2.7/Python.h>
 
 #include "srslte/srslte.h"
 
@@ -70,6 +71,7 @@ int net_port = -1; // -1 generates random dataThat means there is some problem s
 uint32_t cfi=3;
 uint32_t mcs_idx = 1, last_mcs_idx = 1;
 int nof_frames = -1;
+float SNR = 10.0;
 
 char *rf_args = "";
 float rf_amp = 0.8, rf_gain = 70.0, rf_freq = 2400000000;
@@ -88,7 +90,7 @@ srslte_softbuffer_tx_t softbuffer;
 srslte_regs_t regs;
 srslte_ra_dl_dci_t ra_dl;  
 
-cf_t *sf_buffer = NULL, *output_buffer = NULL;
+cf_t *sf_buffer = NULL, *output_buffer = NULL, *noise = NULL;
 int sf_n_re, sf_n_samples;
 
 pthread_t net_thread; 
@@ -101,9 +103,11 @@ srslte_netsink_t net_sink;
 int prbset_num = 1, last_prbset_num = 1; 
 int prbset_orig = 0; 
 
+bool influx_DB = false;
+char *DB_name = "oocran", *DB_ip = "localhost", *DB_NVF = "OOCRAN", *DB_user = "admin", *DB_pwd = "oocran";
 
 void usage(char *prog) {
-  printf("Usage: %s [agmfoncvpu]\n", prog);
+  printf("Usage: %s [algmfoncvpsuEDNIUP]\n", prog);
 #ifndef DISABLE_RF
   printf("\t-a RF args [Default %s]\n", rf_args);
   printf("\t-l RF amplitude [Default %.2f]\n", rf_amp);
@@ -118,13 +122,22 @@ void usage(char *prog) {
   printf("\t-n number of frames [Default %d]\n", nof_frames);
   printf("\t-c cell id [Default %d]\n", cell.id);
   printf("\t-p nof_prb [Default %d]\n", cell.nof_prb);
+  printf("\t-s SNR [Default %d dB]\n", SNR);
   printf("\t-u listen TCP port for input data (-1 is random) [Default %d]\n", net_port);
   printf("\t-v [set srslte_verbose to debug, default none]\n");
+  printf("\t===============================\n");
+  printf("\tinfluxDB settings:\n");
+  printf("\t-E Enable monitoring and configuration [Default %s]\n", influx_DB?"Enabled":"Disabled");
+  printf("\t-D Database [Default %s]\n", DB_name);
+  printf("\t-N NVF [Default %s]\n", DB_NVF);
+  printf("\t-I IP address [Default %s]\n", DB_ip);
+  printf("\t-U User [Default %s]\n", DB_user);
+  printf("\t-P Password [Default %s]\n", DB_pwd);  
 }
 
 void parse_args(int argc, char **argv) {
   int opt;
-  while ((opt = getopt(argc, argv, "aglfmoncpvui")) != -1) {
+  while ((opt = getopt(argc, argv, "aglfmoncpvuisEDNIUP")) != -1) {
     switch (opt) {
     case 'a':
       rf_args = argv[optind];
@@ -159,6 +172,32 @@ void parse_args(int argc, char **argv) {
     case 'c':
       cell.id = atoi(argv[optind]);
       break;
+    case 's':
+      SNR = atof(argv[optind]);
+      break;
+    case 'E':
+	  influx_DB = true;
+	  break;
+    case 'D':
+      DB_name = argv[optind];
+      influx_DB = true;
+      break;
+    case 'N':
+      DB_NVF = argv[optind];
+      influx_DB = true;
+      break;
+    case 'I':
+      DB_ip = argv[optind];
+      influx_DB = true;
+      break;
+    case 'U':
+      DB_user = argv[optind];
+      influx_DB = true;
+      break;
+    case 'P':
+      DB_pwd = argv[optind];
+      influx_DB = true;
+      break;
     case 'v':
       srslte_verbose++;
       break;
@@ -185,6 +224,11 @@ void base_init() {
   }
   output_buffer = srslte_vec_malloc(sizeof(cf_t) * sf_n_samples);
   if (!output_buffer) {
+    perror("malloc");
+    exit(-1);
+  }
+  noise = srslte_vec_malloc(sizeof(cf_t) * sf_n_samples);
+  if (!noise) {
     perror("malloc");
     exit(-1);
   }
@@ -318,6 +362,9 @@ void base_free() {
   }
   if (output_buffer) {
     free(output_buffer);
+  }
+  if (noise) {
+    free(noise);
   }
   if (output_file_name) {
     if (!null_file_sink) {
@@ -528,6 +575,11 @@ int main(int argc, char **argv) {
   srslte_dci_location_t locations[SRSLTE_NSUBFRAMES_X_FRAME][30];
   uint32_t sfn; 
   srslte_chest_dl_t est; 
+  PyObject *py_main;
+  uint32_t tc_iterations;
+  //float variance;
+  int srate;
+  float gain, signal_power, noise_power;
 
   /* file vars */
   char data_file_txt[10000];
@@ -540,9 +592,30 @@ int main(int argc, char **argv) {
   }
 #endif
 
+  //parse arguments
   parse_args(argc, argv);
 
   N_id_2 = cell.id % 3;
+
+  if (influx_DB) {
+	  //initialize Python environment
+	  Py_Initialize();
+	  py_main = PyImport_AddModule("__main__");
+	  PyRun_SimpleString("import requests");
+
+	  //influxDB credentials
+	  PyModule_AddStringConstant(py_main, "NVF", DB_NVF);
+	  PyModule_AddStringConstant(py_main, "IP", DB_ip);
+	  PyModule_AddStringConstant(py_main, "DB", DB_name);
+	  PyModule_AddStringConstant(py_main, "USER", DB_user);
+	  PyModule_AddStringConstant(py_main, "PASSWORD", DB_pwd);
+
+	  //simple test to show functionality
+	  PyModule_AddIntConstant(py_main, "Nid2", (long)N_id_2);
+	  PyRun_SimpleString("id = 'id_' + NVF + ' value=%s' % Nid2");
+	  PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=id)");
+  }
+
   sf_n_re = 2 * SRSLTE_CP_NORM_NSYMB * cell.nof_prb * SRSLTE_NRE;
   sf_n_samples = 2 * SRSLTE_SLOT_LEN(srslte_symbol_sz(cell.nof_prb));
 
@@ -591,9 +664,10 @@ int main(int argc, char **argv) {
   sigprocmask(SIG_UNBLOCK, &sigset, NULL);
   signal(SIGINT, sig_int_handler);
 
+  srate = srslte_sampling_freq_hz(cell.nof_prb);   
+
   if (!output_file_name) {
     
-    int srate = srslte_sampling_freq_hz(cell.nof_prb);    
     //printf("%d\n", srate);
     if (srate != -1) {  
       /*if (srate < 10e6) {
@@ -646,8 +720,13 @@ int main(int argc, char **argv) {
 #ifndef DISABLE_RF
   bool start_of_burst = true; 
 #endif
+
+  srslte_sch_set_max_noi(&pdsch.dl_sch, tc_iterations);
+  
+  SNR = pow(10, SNR/10);
   
   while ((nf < nof_frames || nof_frames == -1) && !go_exit) {
+
     for (sf_idx = 0; sf_idx < SRSLTE_NSUBFRAMES_X_FRAME && (nf < nof_frames || nof_frames == -1); sf_idx++) {
       bzero(sf_buffer, sizeof(cf_t) * sf_n_re);
 
@@ -718,12 +797,12 @@ int main(int argc, char **argv) {
 		  result=char2bin(data_file_txt,data_abc,pdsch_cfg.grant.mcs.tbs/8);
 		  //printf("\n%d re:%d\n",pdsch_cfg.grant.mcs.tbs/8,result);
 		  if(result==pdsch_cfg.grant.mcs.tbs){
-			  //printf("result IGUAL a pdsch_cfg.grant.mcs.tbs");
+			  //printf("result EQUAL to pdsch_cfg.grant.mcs.tbs");
 			  for(i=0;i<pdsch_cfg.grant.mcs.tbs;i++) {
 				  data[i] = data_abc[i];
 			  }
 		  }else{
-			  printf("result diferente a pdsch_cfg.grant.mcs.tbs");
+			  printf("result different from pdsch_cfg.grant.mcs.tbs");
 		  }
 		}
 
@@ -750,6 +829,25 @@ int main(int argc, char **argv) {
       /* send to file or usrp */
       if (output_file_name) {
         if (!null_file_sink) {
+	  /* simulate AWGN channel */
+	  //generate noise
+	  gen_noise_c(noise, 1.0, sf_n_samples);
+
+	  //calculate signal and noise power
+	  signal_power = power_avg(output_buffer, sf_n_samples);
+  	  noise_power = power_avg(noise, sf_n_samples);
+
+	  //correct noise level according expected SNR. SNR=Psignal/(Gain*Pnoise)
+	  gain=sqrt(signal_power/(SNR*noise_power));
+	  /*printf("Noise channel: SNR_lineal=%1.1f, signal_power=%1.6f W, noise_power=%1.6f, gain=%1.6f \n", 
+					SNR, signal_power, noise_power, gain);*/
+
+	  //add noise
+	  for(i=0; i<sf_n_samples; i++){
+		*(output_buffer+i)=*(output_buffer+i)+gain*(*(noise+i));
+	  }
+
+	  //write results in output file
           srslte_filesink_write(&fsink, output_buffer, sf_n_samples);          
         }
         usleep(1000);

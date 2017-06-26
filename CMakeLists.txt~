@@ -141,20 +141,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
    set(CMAKE_SHARED_LINKER_FLAGS "-undefined dynamic_lookup")
 endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
-set(${REQUIRED_PYTHON_VERSION} 2.7)
 
-########################################################################
-# Embed Python code in C
-########################################################################
-find_package ( PythonInterp ${REQUIRED_PYTHON_VERSION} REQUIRED)
-find_package ( PythonLibs ${PYTHON_VERSION_STRING} EXACT)
-
-#set(${PYTHON_INCLUDE_DIR} "/usr/include/python2.7")
-#set(${PYTHON_LIBRARY} "/usr/lib/python2.7/config-x86_64-linux-gnu/libpython2.7.so")
-
-message(STATUS "Python Libraries found: ${PYTHONLIBS_FOUND}")
-message(STATUS "PYTHON_LIBRARY: ${PYTHON_LIBRARY}")
-message(STATUS "PYTHON_INCLUDE_DIR: ${PYTHON_INCLUDE_DIR}")
 
 ########################################################################
 # Create uninstall targets

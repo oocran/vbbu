@@ -274,7 +274,7 @@ int rf_uhd_open(char *args, void **h)
       }
       //added n210
       else if (find_string(devices_str, "type=usrp2") || find_string(devices_str, "type=n210")) {
-              args = "type=usrp2,master_clock_rate=92.16e6";
+              args = "type=usrp2,master_clock_rate=30.72e6";
               handler->dynamic_rate = false;
               handler->devname = DEVNAME_N210;
             }

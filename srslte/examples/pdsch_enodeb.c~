@@ -33,6 +33,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <signal.h>
+#include <python2.7/Python.h>
 
 #include "srslte/srslte.h"
 
@@ -70,6 +71,7 @@ int net_port = -1; // -1 generates random dataThat means there is some problem s
 uint32_t cfi=3;
 uint32_t mcs_idx = 1, last_mcs_idx = 1;
 int nof_frames = -1;
+float SNR = 0.0;
 
 char *rf_args = "";
 float rf_amp = 0.8, rf_gain = 70.0, rf_freq = 2400000000;
@@ -88,7 +90,7 @@ srslte_softbuffer_tx_t softbuffer;
 srslte_regs_t regs;
 srslte_ra_dl_dci_t ra_dl;  
 
-cf_t *sf_buffer = NULL, *output_buffer = NULL;
+cf_t *sf_buffer = NULL, *output_buffer = NULL, *noise = NULL;
 int sf_n_re, sf_n_samples;
 
 pthread_t net_thread; 
@@ -101,9 +103,10 @@ srslte_netsink_t net_sink;
 int prbset_num = 1, last_prbset_num = 1; 
 int prbset_orig = 0; 
 
+char *DB_name = "oocran", *DB_ip = "localhost", *DB_NVF = "OOCRAN", *DB_user = "admin", *DB_pwd = "oocran";
 
 void usage(char *prog) {
-  printf("Usage: %s [agmfoncvpu]\n", prog);
+  printf("Usage: %s [algmfoncvpsuDNIUP]\n", prog);
 #ifndef DISABLE_RF
   printf("\t-a RF args [Default %s]\n", rf_args);
   printf("\t-l RF amplitude [Default %.2f]\n", rf_amp);
@@ -118,13 +121,21 @@ void usage(char *prog) {
   printf("\t-n number of frames [Default %d]\n", nof_frames);
   printf("\t-c cell id [Default %d]\n", cell.id);
   printf("\t-p nof_prb [Default %d]\n", cell.nof_prb);
+  printf("\t-s SNR [Default %d dB]\n", SNR);
   printf("\t-u listen TCP port for input data (-1 is random) [Default %d]\n", net_port);
   printf("\t-v [set srslte_verbose to debug, default none]\n");
+  printf("\t===============================\n");
+  printf("\tinfluxDB settings:\n");
+  printf("\t-D Database [Default %s]\n", DB_name);
+  printf("\t-N NVF [Default %s]\n", DB_NVF);
+  printf("\t-I IP address [Default %s]\n", DB_ip);
+  printf("\t-U User [Default %s]\n", DB_user);
+  printf("\t-P Password [Default %s]\n", DB_pwd);  
 }
 
 void parse_args(int argc, char **argv) {
   int opt;
-  while ((opt = getopt(argc, argv, "aglfmoncpvu")) != -1) {
+  while ((opt = getopt(argc, argv, "aglfmoncpvuisDNIUP")) != -1) {
     switch (opt) {
     case 'a':
       rf_args = argv[optind];
@@ -159,6 +170,24 @@ void parse_args(int argc, char **argv) {
     case 'c':
       cell.id = atoi(argv[optind]);
       break;
+    case 's':
+      SNR = atof(argv[optind]);
+      break;
+    case 'D':
+      DB_name = argv[optind];
+      break;
+    case 'N':
+      DB_NVF = argv[optind];
+      break;
+    case 'I':
+      DB_ip = argv[optind];
+      break;
+    case 'U':
+      DB_user = argv[optind];
+      break;
+    case 'P':
+      DB_pwd = argv[optind];
+      break;
     case 'v':
       srslte_verbose++;
       break;
@@ -185,6 +214,11 @@ void base_init() {
   }
   output_buffer = srslte_vec_malloc(sizeof(cf_t) * sf_n_samples);
   if (!output_buffer) {
+    perror("malloc");
+    exit(-1);
+  }
+  noise = srslte_vec_malloc(sizeof(cf_t) * sf_n_samples);
+  if (!noise) {
     perror("malloc");
     exit(-1);
   }
@@ -223,7 +257,7 @@ void base_init() {
   }
 
   /* open log file */
-  if (srslte_filesink_init(&logsink, "log_enb.txt", SRSLTE_COMPLEX_FLOAT_BIN)) {
+  if (srslte_filesink_init(&logsink, "log_enb.txt", SRSLTE_CHAR)) {
 	  fprintf(stderr, "Error opening log file %s\n", "log_enb.txt");
 	  exit(-1);
   }
@@ -244,6 +278,7 @@ void base_init() {
       perror("sem_init");
       exit(-1);
     }
+    fprintf(logsink.f,"%s","Sockets init successful\n");
   }
 
   /* create ifft object */
@@ -264,9 +299,10 @@ void base_init() {
     fprintf(stderr, "Error initiating regs\n");
     exit(-1);
   }
+  fprintf(logsink.f,"%s","Regs init successful\n");
 
   if (srslte_pcfich_init(&pcfich, &regs, cell)) {
-    fprintf(stderr, "Error creating PBCH object\n");
+    fprintf(stderr, "Error creating PCFICH object\n");
     exit(-1);
   }
   fprintf(logsink.f,"%s","PCFICH created successfully\n");
@@ -275,6 +311,7 @@ void base_init() {
     fprintf(stderr, "Error setting CFI\n");
     exit(-1);
   }
+  fprintf(logsink.f,"%s","CFI set successfully\n");
 
   if (srslte_pdcch_init(&pdcch, &regs, cell)) {
     fprintf(stderr, "Error creating PDCCH object\n");
@@ -289,11 +326,15 @@ void base_init() {
   fprintf(logsink.f,"%s","PDSCH created successfully\n");
   
   srslte_pdsch_set_rnti(&pdsch, UE_CRNTI);
+  fprintf(logsink.f,"%s","CRNTI set successfully\n");
   
   if (srslte_softbuffer_tx_init(&softbuffer, cell.nof_prb)) {
     fprintf(stderr, "Error initiating soft buffer\n");
     exit(-1);
   }
+  fprintf(logsink.f,"%s","Soft buffer init successful\n");
+  fprintf(logsink.f,"%s","Base init successful\n");
+  fprintf(logsink.f,"%s","--------------------\n");
 }
 
 void base_free() {
@@ -311,6 +352,9 @@ void base_free() {
   }
   if (output_buffer) {
     free(output_buffer);
+  }
+  if (noise) {
+    free(noise);
   }
   if (output_file_name) {
     if (!null_file_sink) {
@@ -347,7 +391,6 @@ void sig_int_handler(int signo)
 }
 
 
-
 unsigned int
 reverse(register unsigned int x)
 {
@@ -356,7 +399,6 @@ reverse(register unsigned int x)
     x = (((x & 0xf0f0f0f0) >> 4) | ((x & 0x0f0f0f0f) << 4));
     x = (((x & 0xff00ff00) >> 8) | ((x & 0x00ff00ff) << 8));
     return((x >> 16) | (x << 16));
-
 }
 
 uint32_t prbset_to_bitmask() {
@@ -499,7 +541,7 @@ int char2bin(char *input, uint8_t *output, int len){
 			//printf("%c", input[j]);
 			for(i=7;i>=0;i--){
 				output[l]=((input[j] & (1 << i)) ? 1 : 0);
-				int bit=output[l];
+				//int bit=output[l];
 				//printf("%i", bit);
 				l++;
 			}
@@ -523,6 +565,11 @@ int main(int argc, char **argv) {
   srslte_dci_location_t locations[SRSLTE_NSUBFRAMES_X_FRAME][30];
   uint32_t sfn; 
   srslte_chest_dl_t est; 
+  PyObject *py_main;
+  uint32_t tc_iterations;
+  //float variance;
+  int srate;
+  float gain, signal_power, noise_power;
 
   /* file vars */
   char data_file_txt[10000];
@@ -535,9 +582,52 @@ int main(int argc, char **argv) {
   }
 #endif
 
+  Py_Initialize();
+  py_main = PyImport_AddModule("__main__");
+
+  PyRun_SimpleString("import requests");
+/*  
+  PyRun_SimpleString("NVF = 'OOCRAN'");
+  PyRun_SimpleString("IP = 'localhost'");
+  PyRun_SimpleString("DB = 'oocran'");
+  PyRun_SimpleString("USER = 'admin'");
+  PyRun_SimpleString("PASSWORD = 'oocran'");
+*/
   parse_args(argc, argv);
 
+  PyModule_AddStringConstant(py_main, "NVF", DB_NVF);
+  PyModule_AddStringConstant(py_main, "IP", DB_ip);
+  PyModule_AddStringConstant(py_main, "DB", DB_name);
+  PyModule_AddStringConstant(py_main, "USER", DB_user);
+  PyModule_AddStringConstant(py_main, "PASSWORD", DB_pwd);
+
   N_id_2 = cell.id % 3;
+
+  PyModule_AddIntConstant(py_main, "Nid2", (long)N_id_2);
+  PyRun_SimpleString("id = 'id_' + NVF + ' value=%s' % Nid2");
+  PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=id)");
+
+  //tc_iterations = SRSLTE_PDSCH_MAX_TDEC_ITERS;
+  tc_iterations = 4;
+
+/*  
+  //printf("\nNid2 = %d", N_id_2);
+  //PyRun_SimpleString("print Nid2");
+
+  N_id_2 = 4;
+  PyModule_AddIntConstant(py_main, "Nid2", (long)N_id_2);
+  PyRun_SimpleString("id = 'id_' + NVF + ' value=%s' % Nid2");
+  PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=id)");
+*/
+
+  PyRun_SimpleString("with open('monitor.conf', 'r') as f: txt = f.readlines()");
+  PyRun_SimpleString("Bw_line = None");
+  PyRun_SimpleString("monitor_Bw = None");
+  PyRun_SimpleString("for i, line in enumerate(txt):\n\t if 'bandwidth' in line:\n\t\t Bw_line = i\n\t\t monitor_Bw = line.split(" ")[-1] \n\t\t break");
+  PyRun_SimpleString("initial_Bw = monitor_Bw");
+  /*PyRun_SimpleString("print Bw_line");
+  PyRun_SimpleString("print monitor_Bw");  */
+
   sf_n_re = 2 * SRSLTE_CP_NORM_NSYMB * cell.nof_prb * SRSLTE_NRE;
   sf_n_samples = 2 * SRSLTE_SLOT_LEN(srslte_symbol_sz(cell.nof_prb));
 
@@ -551,15 +641,27 @@ int main(int argc, char **argv) {
   /* this *must* be called after setting slot_len_* */
   base_init();
 
+  fprintf(logsink.f,"%s","CELL PARAMETERS\n");
+  fprintf(logsink.f,"Cell id: %d\n", cell.id);
+  fprintf(logsink.f,"#PRBs: %d\n", cell.nof_prb);
+  fprintf(logsink.f,"%s","--------------------\n");
+
   /* Generate PSS/SSS signals */
-  srslte_pss_generate(pss_signal, N_id_2);
+  if (srslte_pss_generate(pss_signal, N_id_2)) {
+    fprintf(stderr, "Error generating PSS signal\n");
+    exit(-1);
+  }
+  fprintf(logsink.f,"PSS signal generated successfully\n");
+
   srslte_sss_generate(sss_signal0, sss_signal5, cell.id);
+  fprintf(logsink.f,"SSS signals generated successfully\n");
   
   /* Generate CRS signals */
   if (srslte_chest_dl_init(&est, cell)) {
     fprintf(stderr, "Error initializing equalizer\n");
     exit(-1);
   }
+  fprintf(logsink.f,"Channel equalizer init successful\n");
 
   for (i = 0; i < SRSLTE_MAX_PORTS; i++) { // now there's only 1 port
     sf_symbols[i] = sf_buffer;
@@ -568,28 +670,30 @@ int main(int argc, char **argv) {
 
 #ifndef DISABLE_RF
 
-
   sigset_t sigset;
   sigemptyset(&sigset);
   sigaddset(&sigset, SIGINT);
   sigprocmask(SIG_UNBLOCK, &sigset, NULL);
   signal(SIGINT, sig_int_handler);
 
+  srate = srslte_sampling_freq_hz(cell.nof_prb);   
+
   if (!output_file_name) {
     
-    int srate = srslte_sampling_freq_hz(cell.nof_prb);    
+    //printf("%d\n", srate);
     if (srate != -1) {  
-      if (srate < 10e6) {          
-        srslte_rf_set_master_clock_rate(&rf, 4*srate);        
+      /*if (srate < 10e6) {
+        srslte_rf_set_master_clock_rate(&rf, 40*srate);
       } else {
         srslte_rf_set_master_clock_rate(&rf, srate);        
-      }
+      }*/
       printf("Setting sampling rate %.2f MHz\n", (float) srate/1000000);
       float srate_rf = srslte_rf_set_tx_srate(&rf, (double) srate);
       if (srate_rf != srate) {
         fprintf(stderr, "Could not set sampling rate\n");
         exit(-1);
       }
+      fprintf(logsink.f, "Setting sampling rate %.2f MHz\n", (float) srate/1000000);
     } else {
       fprintf(stderr, "Invalid number of PRB %d\n", cell.nof_prb);
       exit(-1);
@@ -597,24 +701,27 @@ int main(int argc, char **argv) {
     printf("Set TX gain: %.1f dB\n", srslte_rf_set_tx_gain(&rf, rf_gain));
     printf("Set TX freq: %.2f MHz\n",
         srslte_rf_set_tx_freq(&rf, rf_freq) / 1000000);
+    fprintf(logsink.f, "Setting Tx gain: %.1f dB\n", rf_gain);
+    fprintf(logsink.f, "Setting Tx freq: %.2f MHz\n", (float) rf_freq / 1000000);
   }
 #endif
 
   if (update_radl(sf_idx)) {
     exit(-1);
   }
+  fprintf(logsink.f, "Updated DL resource allocation");
   
   if (net_port > 0) {
     if (pthread_create(&net_thread, NULL, net_thread_fnc, NULL)) {
       perror("pthread_create");
       exit(-1);
     }
+    fprintf(logsink.f, "Thread for UDP socket created");
   }
   
   /* Initiate valid DCI locations */
   for (i=0;i<SRSLTE_NSUBFRAMES_X_FRAME;i++) {
     srslte_pdcch_ue_locations(&pdcch, locations[i], 30, i, cfi, UE_CRNTI);
-    
   }
     
   nf = 0;
@@ -625,8 +732,17 @@ int main(int argc, char **argv) {
 #ifndef DISABLE_RF
   bool start_of_burst = true; 
 #endif
+
+  srslte_sch_set_max_noi(&pdsch.dl_sch, tc_iterations);
+  
+  SNR = pow(10, SNR/10);
   
   while ((nf < nof_frames || nof_frames == -1) && !go_exit) {
+    /* Monitor conf files and reconfigure if needed */
+    PyRun_SimpleString("with open('monitor.conf', 'r') as f: txt = f.readlines()");
+    PyRun_SimpleString("for i, line in enumerate(txt):\n\t if 'bandwidth' in line:\n\t\t Bw_line = i\n\t\t monitor_Bw = line.split(" ")[-1] \n\t\t break");
+    PyRun_SimpleString("if monitor_Bw != initial_Bw:\n\tprint 'Bandwidth needs to be changed to ' + monitor_Bw\n\tinitial_Bw = monitor_Bw");
+
     for (sf_idx = 0; sf_idx < SRSLTE_NSUBFRAMES_X_FRAME && (nf < nof_frames || nof_frames == -1); sf_idx++) {
       bzero(sf_buffer, sizeof(cf_t) * sf_n_re);
 
@@ -690,21 +806,21 @@ int main(int argc, char **argv) {
           exit(-1);
         }
         
-	/* use data file if required */
-	if (input_file_name) {
-	  srslte_filesource_read(&fsource,data_file_txt,pdsch_cfg.grant.mcs.tbs/8);
+		/* use data file if required */
+		if (input_file_name) {
+		  srslte_filesource_read(&fsource,data_file_txt,pdsch_cfg.grant.mcs.tbs/8);
 
-	  result=char2bin(data_file_txt,data_abc,pdsch_cfg.grant.mcs.tbs/8);
-	  //printf("\n%d re:%d\n",pdsch_cfg.grant.mcs.tbs/8,result);
-	  if(result==pdsch_cfg.grant.mcs.tbs){
-		  //printf("result IGUAL a pdsch_cfg.grant.mcs.tbs");
-		  for(i=0;i<pdsch_cfg.grant.mcs.tbs;i++) {
-			  data[i] = data_abc[i];
+		  result=char2bin(data_file_txt,data_abc,pdsch_cfg.grant.mcs.tbs/8);
+		  //printf("\n%d re:%d\n",pdsch_cfg.grant.mcs.tbs/8,result);
+		  if(result==pdsch_cfg.grant.mcs.tbs){
+			  //printf("result IGUAL a pdsch_cfg.grant.mcs.tbs");
+			  for(i=0;i<pdsch_cfg.grant.mcs.tbs;i++) {
+				  data[i] = data_abc[i];
+			  }
+		  }else{
+			  printf("result diferente a pdsch_cfg.grant.mcs.tbs");
 		  }
-	  }else{
-		  printf("result diferente a pdsch_cfg.grant.mcs.tbs");
-	  }
-	}
+		}
 
         /* Encode PDSCH */
         if (srslte_pdsch_encode(&pdsch, &pdsch_cfg, &softbuffer, data, sf_symbols)) {
@@ -729,6 +845,27 @@ int main(int argc, char **argv) {
       /* send to file or usrp */
       if (output_file_name) {
         if (!null_file_sink) {
+	  /* simulate AWGN channel */
+	  //generate noise
+          //bzero(noise, sizeof(noise));
+	  //srslte_ch_awgn_c(noise, noise, 1.0, sf_n_samples);
+	  gen_noise_c(noise, 1.0, sf_n_samples);
+
+	  //calculate signal and noise power
+	  signal_power = power_avg(output_buffer, sf_n_samples);
+  	  noise_power = power_avg(noise, sf_n_samples);
+
+	  //correct noise level according expected SNR. SNR=Psignal/(Gain*Pnoise)
+	  gain=sqrt(signal_power/(SNR*noise_power));
+	  printf("Noise channel: SNR_lineal=%1.1f, signal_power=%1.6f W, noise_power=%1.6f, gain=%1.6f \n", 
+					SNR, signal_power, noise_power, gain);
+
+	  //add noise
+	  for(i=0; i<sf_n_samples; i++){
+		*(output_buffer+i)=*(output_buffer+i)+gain*(*(noise+i));
+	  }
+
+	  //write results in output file
           srslte_filesink_write(&fsink, output_buffer, sf_n_samples);          
         }
         usleep(1000);

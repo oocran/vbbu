@@ -201,7 +201,7 @@ int main(int argc, char **argv) {
   printf("Set TX freq: %.2f MHz\n",
       srslte_rf_set_tx_freq(&rf, rf_freq) / 1000000);
 
-  //uint32_t nbits; 
+  uint32_t nbits; 
   
   srslte_modem_table_t modulator; 
   srslte_modem_table_init(&modulator);
@@ -213,7 +213,7 @@ int main(int argc, char **argv) {
   srslte_dft_precoding_t dft_precod;
   srslte_dft_precoding_init(&dft_precod, 12);
   
-  //nbits = srslte_cbsegm_cbindex(sf_n_samples/8/srslte_mod_bits_x_symbol(modulation)/3 - 12);
+  nbits = srslte_cbsegm_cbindex(sf_n_samples/8/srslte_mod_bits_x_symbol(modulation)/3 - 12);
   uint32_t ncoded_bits = sf_n_samples/8/srslte_mod_bits_x_symbol(modulation); 
   
   //uint8_t *data     = malloc(sizeof(uint8_t)*nbits);
