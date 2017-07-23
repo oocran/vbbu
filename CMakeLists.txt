@@ -187,6 +187,7 @@ message(STATUS "Building for version: ${VERSION}")
 include_directories(${PROJECT_BINARY_DIR}/srslte/include/)
 include_directories(${PROJECT_SOURCE_DIR}/srslte/include/)
 include_directories(${PROJECT_SOURCE_DIR}/mex/include)
+include_directories(${PYTHON_INCLUDE_DIR})
 
 ########################################################################
 # Add the subdirectories

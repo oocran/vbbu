@@ -227,7 +227,6 @@ int main(int argc, char **argv) {
 
 /*#define kk
 #ifdef kk*/
-      printf("Hola");
       if (sf_idx == 0 || sf_idx == 5) {
         srslte_pss_put_slot(pss_signal, sf_buffer, cell.nof_prb, SRSLTE_CP_NORM);
         srslte_sss_put_slot(sf_idx ? sss_signal5 : sss_signal0, sf_buffer, cell.nof_prb,

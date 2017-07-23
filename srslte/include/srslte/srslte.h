@@ -121,6 +121,8 @@
 #include "srslte/sync/cfo.h"
 #include "srslte/sync/cp.h"
 
+#include "srslte/oocran/monitoring.h"
+
 #ifdef __cplusplus
 }
 #undef I // Fix complex.h #define I nastiness when using C++

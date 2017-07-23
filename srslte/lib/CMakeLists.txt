@@ -35,6 +35,7 @@ add_subdirectory(resampling)
 add_subdirectory(scrambling)
 add_subdirectory(ue)
 add_subdirectory(enb)
+add_subdirectory(oocran)
 
 set(srslte_srcs     version.c
                     $<TARGET_OBJECTS:srslte_agc>
@@ -53,6 +54,7 @@ set(srslte_srcs     version.c
                     $<TARGET_OBJECTS:srslte_scrambling>
                     $<TARGET_OBJECTS:srslte_ue>
                     $<TARGET_OBJECTS:srslte_enb>
+                    $<TARGET_OBJECTS:srslte_oocran>
 )
 
 if(RF_FOUND)
@@ -96,6 +98,8 @@ if(VOLK_FOUND)
     target_link_libraries(srslte_static ${VOLK_LIBRARIES})
   endif(NOT DisableMEX)
 endif(VOLK_FOUND)
+
+target_link_libraries(srslte python2.7)
 
 INSTALL(TARGETS srslte DESTINATION ${LIBRARY_DIR})
 SRSLTE_SET_PIC(srslte)

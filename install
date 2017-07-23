@@ -36,7 +36,6 @@ cmake ../
 sudo make install  
 cd ../..
 #VBBU
-git clone https://github.com/oocran/vbbu.git
 cd vbbu
 mkdir build
 cd build

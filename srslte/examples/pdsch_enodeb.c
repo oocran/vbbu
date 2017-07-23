@@ -65,6 +65,24 @@ srslte_cell_t cell = {
   SRSLTE_PHICH_R_1,          // PHICH resources      
   SRSLTE_PHICH_NORM    // PHICH length
 };
+
+oocran_monitoring_eNB_t monitor = {
+  "oocran",			//name
+  "localhost",		//ip
+  "OOCRAN",			//NVF
+  "admin",			//user
+  "oocran",			//pwd
+  0					//Nid2
+};
+
+/*
+oocran_monitoring_eNB_t monitor;
+monitor.NVF = DB_NVF;
+monitor.ip = DB_ip;
+monitor.name = DB_name;
+monitor.pwd = DB_pwd;
+monitor.user = DB_user;
+*/
   
 int net_port = -1; // -1 generates random dataThat means there is some problem sending samples to the device
 
@@ -104,7 +122,6 @@ int prbset_num = 1, last_prbset_num = 1;
 int prbset_orig = 0; 
 
 bool influx_DB = false;
-char *DB_name = "oocran", *DB_ip = "localhost", *DB_NVF = "OOCRAN", *DB_user = "admin", *DB_pwd = "oocran";
 
 void usage(char *prog) {
   printf("Usage: %s [algmfoncvpsuEDNIUP]\n", prog);
@@ -128,11 +145,11 @@ void usage(char *prog) {
   printf("\t===============================\n");
   printf("\tinfluxDB settings:\n");
   printf("\t-E Enable monitoring and configuration [Default %s]\n", influx_DB?"Enabled":"Disabled");
-  printf("\t-D Database [Default %s]\n", DB_name);
-  printf("\t-N NVF [Default %s]\n", DB_NVF);
-  printf("\t-I IP address [Default %s]\n", DB_ip);
-  printf("\t-U User [Default %s]\n", DB_user);
-  printf("\t-P Password [Default %s]\n", DB_pwd);  
+  printf("\t-D Database [Default %s]\n", monitor.name);
+  printf("\t-N NVF [Default %s]\n", monitor.NVF);
+  printf("\t-I IP address [Default %s]\n", monitor.ip);
+  printf("\t-U User [Default %s]\n", monitor.user);
+  printf("\t-P Password [Default %s]\n", monitor.pwd);
 }
 
 void parse_args(int argc, char **argv) {
@@ -179,23 +196,23 @@ void parse_args(int argc, char **argv) {
 	  influx_DB = true;
 	  break;
     case 'D':
-      DB_name = argv[optind];
+      monitor.name = argv[optind];
       influx_DB = true;
       break;
     case 'N':
-      DB_NVF = argv[optind];
+      monitor.NVF = argv[optind];
       influx_DB = true;
       break;
     case 'I':
-      DB_ip = argv[optind];
+      monitor.ip = argv[optind];
       influx_DB = true;
       break;
     case 'U':
-      DB_user = argv[optind];
+      monitor.user = argv[optind];
       influx_DB = true;
       break;
     case 'P':
-      DB_pwd = argv[optind];
+      monitor.pwd = argv[optind];
       influx_DB = true;
       break;
     case 'v':
@@ -575,7 +592,7 @@ int main(int argc, char **argv) {
   srslte_dci_location_t locations[SRSLTE_NSUBFRAMES_X_FRAME][30];
   uint32_t sfn; 
   srslte_chest_dl_t est; 
-  PyObject *py_main;
+  //PyObject *py_main;
   uint32_t tc_iterations;
   //float variance;
   int srate;
@@ -598,22 +615,9 @@ int main(int argc, char **argv) {
   N_id_2 = cell.id % 3;
 
   if (influx_DB) {
-	  //initialize Python environment
-	  Py_Initialize();
-	  py_main = PyImport_AddModule("__main__");
-	  PyRun_SimpleString("import requests");
-
-	  //influxDB credentials
-	  PyModule_AddStringConstant(py_main, "NVF", DB_NVF);
-	  PyModule_AddStringConstant(py_main, "IP", DB_ip);
-	  PyModule_AddStringConstant(py_main, "DB", DB_name);
-	  PyModule_AddStringConstant(py_main, "USER", DB_user);
-	  PyModule_AddStringConstant(py_main, "PASSWORD", DB_pwd);
-
-	  //simple test to show functionality
-	  PyModule_AddIntConstant(py_main, "Nid2", (long)N_id_2);
-	  PyRun_SimpleString("id = 'id_' + NVF + ' value=%s' % Nid2");
-	  PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=id)");
+	  //write Nid2 to InfluxDB
+	  monitor.Nid2 = N_id_2;
+	  oocran_monitoring_eNB(&monitor);
   }
 
   sf_n_re = 2 * SRSLTE_CP_NORM_NSYMB * cell.nof_prb * SRSLTE_NRE;
@@ -829,28 +833,28 @@ int main(int argc, char **argv) {
       /* send to file or usrp */
       if (output_file_name) {
         if (!null_file_sink) {
-	  /* simulate AWGN channel */
-	  //generate noise
-	  gen_noise_c(noise, 1.0, sf_n_samples);
+		  /* simulate AWGN channel */
+		  //generate noise
+		  gen_noise_c(noise, 1.0, sf_n_samples);
 
-	  //calculate signal and noise power
-	  signal_power = power_avg(output_buffer, sf_n_samples);
-  	  noise_power = power_avg(noise, sf_n_samples);
+		  //calculate signal and noise power
+		  signal_power = power_avg(output_buffer, sf_n_samples);
+		  noise_power = power_avg(noise, sf_n_samples);
 
-	  //correct noise level according expected SNR. SNR=Psignal/(Gain*Pnoise)
-	  gain=sqrt(signal_power/(SNR*noise_power));
-	  /*printf("Noise channel: SNR_lineal=%1.1f, signal_power=%1.6f W, noise_power=%1.6f, gain=%1.6f \n", 
-					SNR, signal_power, noise_power, gain);*/
+		  //correct noise level according expected SNR. SNR=Psignal/(Gain*Pnoise)
+		  gain=sqrt(signal_power/(SNR*noise_power));
+		  /*printf("Noise channel: SNR_lineal=%1.1f, signal_power=%1.6f W, noise_power=%1.6f, gain=%1.6f \n",
+						SNR, signal_power, noise_power, gain);*/
 
-	  //add noise
-	  for(i=0; i<sf_n_samples; i++){
-		*(output_buffer+i)=*(output_buffer+i)+gain*(*(noise+i));
-	  }
+		  //add noise
+		  for(i=0; i<sf_n_samples; i++){
+			*(output_buffer+i)=*(output_buffer+i)+gain*(*(noise+i));
+		  }
 
-	  //write results in output file
-          srslte_filesink_write(&fsink, output_buffer, sf_n_samples);          
-        }
-        usleep(1000);
+		  //write results in output file
+			  srslte_filesink_write(&fsink, output_buffer, sf_n_samples);
+			}
+			usleep(1000);
       } else {
 #ifndef DISABLE_RF
         // FIXME
