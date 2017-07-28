@@ -63,13 +63,13 @@ int oocran_reconfiguration_tc_iterations(void) {
 
   if( access("monitor.conf", R_OK) != -1 ) {
 	  PyRun_SimpleString("with open('monitor.conf', 'r') as f: txt = f.readlines()");
-  } else {
-	  PyRun_SimpleString("txt = ['iterations 4']");
-  }
-  PyRun_SimpleString("for line in txt:\n\t if 'iterations' in line:\n\t\t tc_iterations = int(line.split(" ")[-1]) \n\t\t break");
+	  PyRun_SimpleString("for line in txt:\n\t if 'iterations' in line:\n\t\t tc_iterations = int(line.split(" ")[-1]) \n\t\t break");
 
-  py_handler = PyObject_GetAttrString(py_main,"tc_iterations");
-  iterations = PyInt_AsLong(py_handler);
+	  py_handler = PyObject_GetAttrString(py_main,"tc_iterations");
+	  iterations = PyInt_AsLong(py_handler);
+  } else {
+	  iterations = 4;
+  }
 
   pMainThreadState = PyEval_SaveThread();
 
