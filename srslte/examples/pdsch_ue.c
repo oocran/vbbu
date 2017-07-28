@@ -54,14 +54,17 @@ cell_search_cfg_t cell_detect_config = {
 };
 
 oocran_monitoring_UE_t monitor = {
+  30.0,				//SNR
+  0.0,				//BLER
+  4					//turbo code iterations (SRSLTE_PDSCH_MAX_TDEC_ITERS)
+};
+
+DB_credentials_t credentials = {
   "oocran",			//name
   "localhost",		//ip
   "OOCRAN",			//NVF
   "admin",			//user
-  "oocran",			//password
-  30.0,				//SNR
-  0.0,				//BLER
-  4					//turbo code iterations (SRSLTE_PDSCH_MAX_TDEC_ITERS)
+  "oocran"			//password
 };
 
 #else
@@ -141,11 +144,11 @@ void args_default(prog_args_t *args) {
   args->net_port_signal = -1; 
   args->net_address_signal = "127.0.0.1";
   args->influx_DB = false;
-  args->DB_name = monitor.name;
-  args->DB_ip = monitor.ip;
-  args->DB_NVF = monitor.NVF;
-  args->DB_user = monitor.user;
-  args->DB_pwd = monitor.pwd;
+  args->DB_name = credentials.name;
+  args->DB_ip = credentials.ip;
+  args->DB_NVF = credentials.NVF;
+  args->DB_user = credentials.user;
+  args->DB_pwd = credentials.pwd;
 }
 
 void usage(prog_args_t *args, char *prog) {
@@ -262,27 +265,27 @@ void parse_args(prog_args_t *args, int argc, char **argv) {
       break;
     case 'B':
       args->DB_name = argv[optind];
-      monitor.name = args->DB_name;
+      credentials.name = args->DB_name;
       args->influx_DB = true;
       break;
     case 'N':
       args->DB_NVF = argv[optind];
-      monitor.NVF = args->DB_NVF;
+      credentials.NVF = args->DB_NVF;
       args->influx_DB = true;
       break;
     case 'I':
       args->DB_ip = argv[optind];
-      monitor.ip = args->DB_ip;
+      credentials.ip = args->DB_ip;
       args->influx_DB = true;
       break;
     case 'R':
       args->DB_user = argv[optind];
-      monitor.user = args->DB_user;
+      credentials.user = args->DB_user;
       args->influx_DB = true;
       break;
     case 'W':
       args->DB_pwd = argv[optind];
-      monitor.pwd = args->DB_pwd;
+      credentials.pwd = args->DB_pwd;
       args->influx_DB = true;
       break;
     case 'v':
@@ -566,7 +569,11 @@ int main(int argc, char **argv) {
   srslte_ue_sync_set_cfo(&ue_sync, cfo); 
   
   srslte_pbch_decode_reset(&ue_mib.pbch);
-            
+
+  if (prog_args.influx_DB) {
+	  oocran_monitoring_init(&credentials);
+  }
+
   INFO("\nEntering main loop...\n\n", 0);
   /* Main loop */
   while (!go_exit && (sf_cnt < prog_args.nof_subframes || prog_args.nof_subframes == -1)) {
@@ -752,6 +759,10 @@ int main(int argc, char **argv) {
     srslte_rf_close(&rf);    
   }
 #endif
+
+  if (prog_args.influx_DB) {
+    oocran_monitoring_exit();
+  }
 
   exit(0);
 }

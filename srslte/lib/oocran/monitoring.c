@@ -1,39 +1,41 @@
 #include <python2.7/Python.h>
 #include "srslte/oocran/monitoring.h"
 
-void oocran_monitoring_eNB(oocran_monitoring_eNB_t *q) {
-  PyObject *py_main;
+PyObject *py_main;
+PyThreadState *pMainThreadState;
+
+// initialize Python interpreter and add DB credentials
+void oocran_monitoring_init(DB_credentials_t *q) {
   Py_Initialize();
   py_main = PyImport_AddModule("__main__");
   PyRun_SimpleString("import requests");
 
-  //influxDB credentials
   PyModule_AddStringConstant(py_main, "NVF", q->NVF);
   PyModule_AddStringConstant(py_main, "IP", q->ip);
   PyModule_AddStringConstant(py_main, "DB", q->name);
   PyModule_AddStringConstant(py_main, "USER", q->user);
   PyModule_AddStringConstant(py_main, "PASSWORD", q->pwd);
 
-  PyModule_AddIntConstant(py_main, "Nid2", (long)q->Nid2);
+  PyEval_InitThreads();
+  pMainThreadState = PyEval_SaveThread();
+}
 
+// store eNB parameters in DB
+void oocran_monitoring_eNB(oocran_monitoring_eNB_t *q) {
+  PyEval_AcquireThread(pMainThreadState);
+
+  PyModule_AddIntConstant(py_main, "Nid2", (long)q->Nid2);
   PyRun_SimpleString("id = 'id_' + NVF + ' value=%s' % Nid2");
   PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=id)");
 
-  Py_Finalize();
+  pMainThreadState = PyEval_SaveThread();
 }
 
+// store UE parameters in DB
 void oocran_monitoring_UE(oocran_monitoring_UE_t *q) {
-  PyObject *py_main, *py_BLER, *py_SNR;
-  Py_Initialize();
-  py_main = PyImport_AddModule("__main__");
-  PyRun_SimpleString("import requests");
+  PyObject *py_BLER, *py_SNR;
 
-  //influxDB credentials
-  PyModule_AddStringConstant(py_main, "NVF", q->NVF);
-  PyModule_AddStringConstant(py_main, "IP", q->ip);
-  PyModule_AddStringConstant(py_main, "DB", q->name);
-  PyModule_AddStringConstant(py_main, "USER", q->user);
-  PyModule_AddStringConstant(py_main, "PASSWORD", q->pwd);
+  PyEval_AcquireThread(pMainThreadState);
 
   py_BLER = Py_BuildValue("d", q->BLER);
   py_SNR = Py_BuildValue("d", q->SNR);
@@ -49,21 +51,34 @@ void oocran_monitoring_UE(oocran_monitoring_UE_t *q) {
   PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=SNR)");
   PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=iterations)");
 
-  Py_Finalize();
+  pMainThreadState = PyEval_SaveThread();
 }
 
+// check 'monitor.conf' file
 int oocran_reconfiguration_tc_iterations(void) {
-  PyObject *py_main, *py_handler;
+  PyObject *py_handler;
   int iterations;
-  Py_Initialize();
-  py_main = PyImport_AddModule("__main__");
 
-  PyRun_SimpleString("with open('monitor.conf', 'r') as f: txt = f.readlines()");
+  PyEval_AcquireThread(pMainThreadState);
+
+  if( access("monitor.conf", R_OK) != -1 ) {
+	  PyRun_SimpleString("with open('monitor.conf', 'r') as f: txt = f.readlines()");
+  } else {
+	  PyRun_SimpleString("txt = ['iterations 4']");
+  }
   PyRun_SimpleString("for line in txt:\n\t if 'iterations' in line:\n\t\t tc_iterations = int(line.split(" ")[-1]) \n\t\t break");
+
   py_handler = PyObject_GetAttrString(py_main,"tc_iterations");
   iterations = PyInt_AsLong(py_handler);
 
-  Py_Finalize();
+  pMainThreadState = PyEval_SaveThread();
 
   return iterations;
+}
+
+// close Python interpreter
+void oocran_monitoring_exit(void) {
+	// clean up
+	PyEval_AcquireThread(pMainThreadState);
+    Py_Finalize();
 }

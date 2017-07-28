@@ -67,22 +67,16 @@ srslte_cell_t cell = {
 };
 
 oocran_monitoring_eNB_t monitor = {
+  0					//Nid2
+};
+
+DB_credentials_t credentials = {
   "oocran",			//name
   "localhost",		//ip
   "OOCRAN",			//NVF
   "admin",			//user
   "oocran",			//pwd
-  0					//Nid2
 };
-
-/*
-oocran_monitoring_eNB_t monitor;
-monitor.NVF = DB_NVF;
-monitor.ip = DB_ip;
-monitor.name = DB_name;
-monitor.pwd = DB_pwd;
-monitor.user = DB_user;
-*/
   
 int net_port = -1; // -1 generates random dataThat means there is some problem sending samples to the device
 
@@ -145,11 +139,11 @@ void usage(char *prog) {
   printf("\t===============================\n");
   printf("\tinfluxDB settings:\n");
   printf("\t-E Enable monitoring and configuration [Default %s]\n", influx_DB?"Enabled":"Disabled");
-  printf("\t-D Database [Default %s]\n", monitor.name);
-  printf("\t-N NVF [Default %s]\n", monitor.NVF);
-  printf("\t-I IP address [Default %s]\n", monitor.ip);
-  printf("\t-U User [Default %s]\n", monitor.user);
-  printf("\t-P Password [Default %s]\n", monitor.pwd);
+  printf("\t-D Database [Default %s]\n", credentials.name);
+  printf("\t-N NVF [Default %s]\n", credentials.NVF);
+  printf("\t-I IP address [Default %s]\n", credentials.ip);
+  printf("\t-U User [Default %s]\n", credentials.user);
+  printf("\t-P Password [Default %s]\n", credentials.pwd);
 }
 
 void parse_args(int argc, char **argv) {
@@ -196,23 +190,23 @@ void parse_args(int argc, char **argv) {
 	  influx_DB = true;
 	  break;
     case 'D':
-      monitor.name = argv[optind];
+      credentials.name = argv[optind];
       influx_DB = true;
       break;
     case 'N':
-      monitor.NVF = argv[optind];
+      credentials.NVF = argv[optind];
       influx_DB = true;
       break;
     case 'I':
-      monitor.ip = argv[optind];
+      credentials.ip = argv[optind];
       influx_DB = true;
       break;
     case 'U':
-      monitor.user = argv[optind];
+      credentials.user = argv[optind];
       influx_DB = true;
       break;
     case 'P':
-      monitor.pwd = argv[optind];
+      credentials.pwd = argv[optind];
       influx_DB = true;
       break;
     case 'v':
@@ -617,6 +611,7 @@ int main(int argc, char **argv) {
   if (influx_DB) {
 	  //write Nid2 to InfluxDB
 	  monitor.Nid2 = N_id_2;
+	  oocran_monitoring_init(&credentials);
 	  oocran_monitoring_eNB(&monitor);
   }
 
