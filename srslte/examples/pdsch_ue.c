@@ -60,8 +60,7 @@ oocran_monitoring_UE_t monitor = {
   "admin",			//user
   "oocran",			//password
   30.0,				//SNR
-  0,				//pkt_errors
-  100,				//pkt_total
+  0.0,				//BLER
   4					//turbo code iterations (SRSLTE_PDSCH_MAX_TDEC_ITERS)
 };
 
@@ -695,8 +694,7 @@ int main(int argc, char **argv) {
 
         	if (prog_args.influx_DB) {
 				//store BLER, SNR and iterations in influxDB
-        		monitor.pkt_errors = ue_dl.pkt_errors;
-        		monitor.pkt_total = ue_dl.pkts_total;
+        		monitor.BLER = BLER;
         		monitor.SNR = 10*log10(rsrp/noise);
         		monitor.iterations = tc_iterations;
 				oocran_monitoring_UE(&monitor);

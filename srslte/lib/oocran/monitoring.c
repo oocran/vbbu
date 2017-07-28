@@ -23,7 +23,7 @@ void oocran_monitoring_eNB(oocran_monitoring_eNB_t *q) {
 }
 
 void oocran_monitoring_UE(oocran_monitoring_UE_t *q) {
-  PyObject *py_main;
+  PyObject *py_main, *py_BLER, *py_SNR;
   Py_Initialize();
   py_main = PyImport_AddModule("__main__");
   PyRun_SimpleString("import requests");
@@ -35,14 +35,14 @@ void oocran_monitoring_UE(oocran_monitoring_UE_t *q) {
   PyModule_AddStringConstant(py_main, "USER", q->user);
   PyModule_AddStringConstant(py_main, "PASSWORD", q->pwd);
 
-  PyModule_AddIntConstant(py_main, "pkt_errors", q->pkt_errors);
-  PyModule_AddIntConstant(py_main, "pkt_total", q->pkt_total);
-  PyModule_AddIntConstant(py_main, "snr", (long)q->SNR);
+  py_BLER = Py_BuildValue("d", q->BLER);
+  py_SNR = Py_BuildValue("d", q->SNR);
+  PyModule_AddObject(py_main, "BLERs", py_BLER);
+  PyModule_AddObject(py_main, "snr", py_SNR);
   PyModule_AddIntConstant(py_main, "iteration", q->iterations);
 
-  PyRun_SimpleString("BLERs = 100*float(float(pkt_errors)/float(pkt_total))");
   PyRun_SimpleString("BLER = 'BLER_' + NVF + ' value=%s' % BLERs");
-  PyRun_SimpleString("SNR = 'SNR_' + NVF + ' value=%s' % snr");
+  PyRun_SimpleString("SNR = 'SNR_' + NVF + ' value=%s' % round(snr, 1)");
   PyRun_SimpleString("iterations = 'iterations_' + NVF + ' value=%s' % iteration");
 
   PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=BLER)");

@@ -27,8 +27,7 @@ typedef struct SRSLTE_API {
   char *user;
   char *pwd;
   double SNR;
-  int pkt_errors;
-  int pkt_total;
+  double BLER;
   int iterations;
 } oocran_monitoring_UE_t;
 
