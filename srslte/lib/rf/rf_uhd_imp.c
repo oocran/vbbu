@@ -356,8 +356,10 @@ int rf_uhd_open(char *args, void **h)
     uhd_rx_metadata_make(&handler->rx_md_first);
     uhd_tx_metadata_make(&handler->tx_md, false, 0, 0, false, false);
 
-    //prova
+    // force master clock rate
+    handler->dynamic_rate = true;
     uhd_usrp_set_master_clock_rate(handler->usrp, 30.72e6*3, 0);
+    handler->dynamic_rate = false;
   
     return 0;
   } else {
@@ -391,6 +393,7 @@ void rf_uhd_set_master_clock_rate(void *h, double rate) {
   rf_uhd_handler_t *handler = (rf_uhd_handler_t*) h;
   if (handler->dynamic_rate) {
     uhd_usrp_set_master_clock_rate(handler->usrp, 30.72e6*3, 0);
+    printf("Master Clock Rate set to: %.2f MHz", 30.72e6*3);
   }
 }
 

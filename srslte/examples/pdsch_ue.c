@@ -700,7 +700,7 @@ int main(int argc, char **argv) {
         if (sfn == 1024) {
 
         	if (prog_args.influx_DB) {
-				//store BLER, SNR and iterations in influxDB
+				//store UE parameters in influxDB
         		monitor.BLER = BLER;
         		monitor.SNR = 10*log10(rsrp/noise);
         		monitor.iterations = tc_iterations;

@@ -22,7 +22,7 @@ typedef struct SRSLTE_API {
 
 // eNB parameters to monitor
 typedef struct SRSLTE_API {
-  int Nid2;
+  int RB_assigned;
 } oocran_monitoring_eNB_t;
 
 // UE parameters to monitor

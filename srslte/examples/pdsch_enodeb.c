@@ -67,7 +67,7 @@ srslte_cell_t cell = {
 };
 
 oocran_monitoring_eNB_t monitor = {
-  0					//Nid2
+  0					//RB assigned
 };
 
 DB_credentials_t credentials = {
@@ -137,7 +137,7 @@ void usage(char *prog) {
   printf("\t-u listen TCP port for input data (-1 is random) [Default %d]\n", net_port);
   printf("\t-v [set srslte_verbose to debug, default none]\n");
   printf("\t===============================\n");
-  printf("\tinfluxDB settings:\n");
+  printf("\tInfluxDB settings:\n");
   printf("\t-E Enable monitoring and configuration [Default %s]\n", influx_DB?"Enabled":"Disabled");
   printf("\t-D Database [Default %s]\n", credentials.name);
   printf("\t-N NVF [Default %s]\n", credentials.NVF);
@@ -586,9 +586,7 @@ int main(int argc, char **argv) {
   srslte_dci_location_t locations[SRSLTE_NSUBFRAMES_X_FRAME][30];
   uint32_t sfn; 
   srslte_chest_dl_t est; 
-  //PyObject *py_main;
   uint32_t tc_iterations;
-  //float variance;
   int srate;
   float gain, signal_power, noise_power;
 
@@ -609,8 +607,7 @@ int main(int argc, char **argv) {
   N_id_2 = cell.id % 3;
 
   if (influx_DB) {
-	  //write Nid2 to InfluxDB
-	  monitor.Nid2 = N_id_2;
+	  //write parameters to InfluxDB
 	  oocran_monitoring_init(&credentials);
 	  oocran_monitoring_eNB(&monitor);
   }
@@ -667,7 +664,6 @@ int main(int argc, char **argv) {
 
   if (!output_file_name) {
     
-    //printf("%d\n", srate);
     if (srate != -1) {  
       /*if (srate < 10e6) {
         srslte_rf_set_master_clock_rate(&rf, 40*srate);
@@ -728,6 +724,12 @@ int main(int argc, char **argv) {
 
     for (sf_idx = 0; sf_idx < SRSLTE_NSUBFRAMES_X_FRAME && (nf < nof_frames || nof_frames == -1); sf_idx++) {
       bzero(sf_buffer, sizeof(cf_t) * sf_n_re);
+
+	  if (influx_DB && sfn == 0 && sf_idx == 0) {
+		  //write parameters to InfluxDB
+		  monitor.RB_assigned = cell.nof_prb;
+		  oocran_monitoring_eNB(&monitor);
+	  }
 
       if (sf_idx == 0 || sf_idx == 5) {
         srslte_pss_put_slot(pss_signal, sf_buffer, cell.nof_prb, SRSLTE_CP_NORM);

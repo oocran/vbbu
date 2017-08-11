@@ -24,9 +24,9 @@ void oocran_monitoring_init(DB_credentials_t *q) {
 void oocran_monitoring_eNB(oocran_monitoring_eNB_t *q) {
   PyEval_AcquireThread(pMainThreadState);
 
-  PyModule_AddIntConstant(py_main, "Nid2", (long)q->Nid2);
-  PyRun_SimpleString("id = 'id_' + NVF + ' value=%s' % Nid2");
-  PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=id)");
+  PyModule_AddIntConstant(py_main, "RBA", (long)q->RB_assigned);
+  PyRun_SimpleString("rba = 'rba_' + NVF + ' value=%s' % RBA");
+  PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=rba)");
 
   pMainThreadState = PyEval_SaveThread();
 }
