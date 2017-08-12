@@ -53,6 +53,10 @@ cell_search_cfg_t cell_detect_config = {
   0
 };
 
+#else
+#warning Compiling pdsch_ue with no RF support
+#endif
+
 oocran_monitoring_UE_t monitor = {
   30.0,				//SNR
   0.0,				//BLER
@@ -66,10 +70,6 @@ DB_credentials_t credentials = {
   "admin",			//user
   "oocran"			//password
 };
-
-#else
-#warning Compiling pdsch_ue with no RF support
-#endif
 
 //#define STDOUT_COMPACT
 
@@ -187,7 +187,7 @@ void usage(prog_args_t *args, char *prog) {
   printf("\t-v [set srslte_verbose to debug, default none]\n");
   printf("\t===============================\n");
   printf("\tinfluxDB settings:\n");
-  printf("\t-E Enable monitoring and configuration [Default %s]\n", args->influx_DB?"Enabled":"Disabled");
+  printf("\t-E Enable monitoring and configuration [Default %s]\n", args->influx_DB?"Disabled":"Enabled");
   printf("\t-B Database [Default %s]\n", args->DB_name);
   printf("\t-N NVF [Default %s]\n", args->DB_NVF);
   printf("\t-I IP address [Default %s]\n", args->DB_ip);

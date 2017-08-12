@@ -138,7 +138,7 @@ void usage(char *prog) {
   printf("\t-v [set srslte_verbose to debug, default none]\n");
   printf("\t===============================\n");
   printf("\tInfluxDB settings:\n");
-  printf("\t-E Enable monitoring and configuration [Default %s]\n", influx_DB?"Enabled":"Disabled");
+  printf("\t-E Enable monitoring and configuration [Default %s]\n", influx_DB?"Disabled":"Enabled");
   printf("\t-D Database [Default %s]\n", credentials.name);
   printf("\t-N NVF [Default %s]\n", credentials.NVF);
   printf("\t-I IP address [Default %s]\n", credentials.ip);
