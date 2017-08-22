@@ -384,7 +384,7 @@
           "thresholds": [],
           "timeFrom": null,
           "timeShift": null,
-          "title": "PDSCH BLER (%)",
+          "title": "PDSCH BLER (%) (UE)",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -472,7 +472,7 @@
           "thresholds": [],
           "timeFrom": null,
           "timeShift": null,
-          "title": "Turbo Code Iterations",
+          "title": "Turbo Code Iterations (UE)",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -560,7 +560,7 @@
           "thresholds": [],
           "timeFrom": null,
           "timeShift": null,
-          "title": "SNR",
+          "title": "SNR (UE)",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -660,7 +660,7 @@
           "thresholds": [],
           "timeFrom": null,
           "timeShift": null,
-          "title": "Resource Block Assigned",
+          "title": "Resource Block Assigned (eNB)",
           "tooltip": {
             "shared": true,
             "sort": 0,
