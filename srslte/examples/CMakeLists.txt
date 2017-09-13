@@ -27,6 +27,12 @@ add_executable(synch_file synch_file.c)
 target_link_libraries(synch_file srslte)
 
 #################################################################
+# Add oocran reconfiguration file
+#################################################################
+
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/monitor.conf" "iterations 4\nmcs 1")
+
+#################################################################
 # These can be compiled without UHD or graphics support
 #################################################################
 

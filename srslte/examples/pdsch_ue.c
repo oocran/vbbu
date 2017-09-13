@@ -580,7 +580,7 @@ int main(int argc, char **argv) {
 
 	if (prog_args.influx_DB && sfn == 1000) {
 		//reconfigure number of turbo code iterations
-		tc_iterations = oocran_reconfiguration_tc_iterations();
+		tc_iterations = oocran_reconfiguration_UE();
 
 		if ((tc_iterations != monitor.iterations) && (tc_iterations >= 1) && (tc_iterations <= 10)) {
 			printf("\nRECONFIGURATION - The number of turbo code iterations will be changed to: %d \n", tc_iterations);

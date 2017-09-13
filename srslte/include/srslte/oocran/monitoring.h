@@ -23,6 +23,7 @@ typedef struct SRSLTE_API {
 // eNB parameters to monitor
 typedef struct SRSLTE_API {
   int RB_assigned;
+  int MCS;
 } oocran_monitoring_eNB_t;
 
 // UE parameters to monitor
@@ -38,6 +39,8 @@ SRSLTE_API void oocran_monitoring_eNB(oocran_monitoring_eNB_t *q);
 
 SRSLTE_API void oocran_monitoring_UE(oocran_monitoring_UE_t *q);
 
-SRSLTE_API int oocran_reconfiguration_tc_iterations(void);
+SRSLTE_API int oocran_reconfiguration_eNB(void);
+
+SRSLTE_API int oocran_reconfiguration_UE(void);
 
 SRSLTE_API void oocran_monitoring_exit(void);

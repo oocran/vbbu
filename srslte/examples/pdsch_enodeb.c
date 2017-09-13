@@ -719,7 +719,7 @@ int main(int argc, char **argv) {
   srslte_sch_set_max_noi(&pdsch.dl_sch, tc_iterations);
   
   SNR = pow(10, SNR/10);
-  
+
   while ((nf < nof_frames || nof_frames == -1) && !go_exit) {
 
     for (sf_idx = 0; sf_idx < SRSLTE_NSUBFRAMES_X_FRAME && (nf < nof_frames || nof_frames == -1); sf_idx++) {
@@ -729,6 +729,12 @@ int main(int argc, char **argv) {
 		  //write parameters to InfluxDB
 		  monitor.RB_assigned = cell.nof_prb;
 		  oocran_monitoring_eNB(&monitor);
+
+		  mcs_idx = oocran_reconfiguration_eNB();
+		  if ((mcs_idx != last_mcs_idx) && (mcs_idx >= 0) && (mcs_idx <= 31)) {
+		      printf("\nRECONFIGURATION - The MCS will be changed to: %d \n", mcs_idx);
+		      last_mcs_idx = mcs_idx;
+		  }
 	  }
 
       if (sf_idx == 0 || sf_idx == 5) {

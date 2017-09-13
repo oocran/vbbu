@@ -55,7 +55,29 @@ void oocran_monitoring_UE(oocran_monitoring_UE_t *q) {
 }
 
 // check 'monitor.conf' file
-int oocran_reconfiguration_tc_iterations(void) {
+int oocran_reconfiguration_eNB(void) {
+  PyObject *py_handler;
+  int MCS;
+
+  PyEval_AcquireThread(pMainThreadState);
+
+  if( access("monitor.conf", R_OK) != -1 ) {
+	  PyRun_SimpleString("with open('monitor.conf', 'r') as f: txt = f.readlines()");
+	  PyRun_SimpleString("for line in txt:\n\t if 'mcs' in line:\n\t\t mcs = int(line.split(" ")[-1]) \n\t\t break");
+
+	  py_handler = PyObject_GetAttrString(py_main,"mcs");
+	  MCS = PyInt_AsLong(py_handler);
+  } else {
+	  MCS = 1;
+  }
+
+  pMainThreadState = PyEval_SaveThread();
+
+  return MCS;
+}
+
+// check 'monitor.conf' file
+int oocran_reconfiguration_UE(void) {
   PyObject *py_handler;
   int iterations;
 
