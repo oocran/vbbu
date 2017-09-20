@@ -20,20 +20,13 @@ sudo apt-get install libuhd-dev libuhd003 uhd-host -y
 #BOOST
 sudo apt-get install libboost-system-dev libboost-test-dev libboost-thread-dev libqwt-dev libqt4-dev -y
 #srsGUI
-if [ "$1" == "gui" ];
-then
-    echo "Install srsGUI"
-    git clone https://github.com/suttonpd/srsgui.git
-    cd srsgui
-    mkdir build
-    cd build
-    cmake ../
-    sudo make install
-    cd ../.. 
-else
-	echo "Install without srsGUI"
-    sed -i -e 's/target_link_libraries(pdsch_ue ${SRSGUI_LIBRARIES})/target_link_libraries(pdsch_ue ${SRSGUI_LIBRARIES})\n  add_definitions(-DDISABLE_GRAPHICS)/g' srslte/examples/CMakeLists.txt
-fi
+git clone https://github.com/suttonpd/srsgui.git
+cd srsgui
+mkdir build
+cd build
+cmake ../
+sudo make install
+cd ../.. 
 #VOLK
 git clone https://github.com/gnuradio/volk.git
 cd volk
@@ -54,5 +47,6 @@ ln -s "$path"/* /usr/bin
 cd ../..
 sudo echo "\nnet.core.rmem_max=50000000" >> /etc/sysctl.conf
 sudo echo "\nnet.core.wmem_max=1048576" >> /etc/sysctl.conf
+
 sudo echo "\nroot  -   rtprio    99" >> /etc/security/limits.conf
 sudo echo "\nroot    -   memlock   unlimited" >> /etc/security/limits.conf
