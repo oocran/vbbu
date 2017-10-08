@@ -24,6 +24,7 @@ typedef struct SRSLTE_API {
 typedef struct SRSLTE_API {
   int RB_assigned;
   int MCS;
+  int throughput;
 } oocran_monitoring_eNB_t;
 
 // UE parameters to monitor

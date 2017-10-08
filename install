@@ -56,3 +56,4 @@ sudo echo "\nnet.core.rmem_max=50000000" >> /etc/sysctl.conf
 sudo echo "\nnet.core.wmem_max=1048576" >> /etc/sysctl.conf
 sudo echo "\nroot  -   rtprio    99" >> /etc/security/limits.conf
 sudo echo "\nroot    -   memlock   unlimited" >> /etc/security/limits.conf
+

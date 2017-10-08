@@ -67,7 +67,9 @@ srslte_cell_t cell = {
 };
 
 oocran_monitoring_eNB_t monitor = {
-  0					//RB assigned
+  0,					//RB assigned
+  1,					//MCS
+  0						//throughput
 };
 
 DB_credentials_t credentials = {
@@ -609,7 +611,6 @@ int main(int argc, char **argv) {
   if (influx_DB) {
 	  //write parameters to InfluxDB
 	  oocran_monitoring_init(&credentials);
-	  oocran_monitoring_eNB(&monitor);
   }
 
   sf_n_re = 2 * SRSLTE_CP_NORM_NSYMB * cell.nof_prb * SRSLTE_NRE;
@@ -701,12 +702,12 @@ int main(int argc, char **argv) {
     }
     fprintf(logsink.f, "Thread for UDP socket created");
   }
-  
+
   /* Initiate valid DCI locations */
   for (i=0;i<SRSLTE_NSUBFRAMES_X_FRAME;i++) {
     srslte_pdcch_ue_locations(&pdcch, locations[i], 30, i, cfi, UE_CRNTI);
   }
-    
+
   nf = 0;
   
   bool send_data = false; 
@@ -727,14 +728,18 @@ int main(int argc, char **argv) {
 
 	  if (influx_DB && sfn == 0 && sf_idx == 0) {
 		  //write parameters to InfluxDB
-		  monitor.RB_assigned = cell.nof_prb;
-		  oocran_monitoring_eNB(&monitor);
 
 		  mcs_idx = oocran_reconfiguration_eNB();
 		  if ((mcs_idx != last_mcs_idx) && (mcs_idx >= 0) && (mcs_idx <= 31)) {
-		      printf("\nRECONFIGURATION - The MCS will be changed to: %d \n", mcs_idx);
+		      printf("\n\nRECONFIGURATION - The MCS will be changed to: %d \n\n", mcs_idx);
 		      last_mcs_idx = mcs_idx;
+		      update_radl();
 		  }
+
+		  monitor.RB_assigned = cell.nof_prb;
+		  monitor.throughput = 1000*pdsch_cfg.grant.mcs.tbs;
+		  monitor.MCS = mcs_idx;
+		  oocran_monitoring_eNB(&monitor);
 	  }
 
       if (sf_idx == 0 || sf_idx == 5) {

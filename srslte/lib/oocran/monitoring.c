@@ -25,8 +25,16 @@ void oocran_monitoring_eNB(oocran_monitoring_eNB_t *q) {
   PyEval_AcquireThread(pMainThreadState);
 
   PyModule_AddIntConstant(py_main, "RBA", (long)q->RB_assigned);
+  PyModule_AddIntConstant(py_main, "MCS", (long)q->MCS);
+  PyModule_AddIntConstant(py_main, "Throughput", (long)q->throughput);
+
   PyRun_SimpleString("rba = 'rba_' + NVF + ' value=%s' % RBA");
+  PyRun_SimpleString("mcs = 'mcs_' + NVF + ' value=%s' % MCS");
+  PyRun_SimpleString("throughput = 'throughput_' + NVF + ' value=%s' % Throughput");
+
   PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=rba)");
+  PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=mcs)");
+  PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=throughput)");
 
   pMainThreadState = PyEval_SaveThread();
 }
