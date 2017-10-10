@@ -78,8 +78,8 @@ void oocran_monitoring_UE(oocran_monitoring_UE_t *q) {
   PyModule_AddObject(py_main, "snr", py_SNR);
   PyModule_AddIntConstant(py_main, "iteration", q->iterations);
 
-  PyRun_SimpleString("BLER = 'BLER_' + NVF + ' value=%s' % BLERs");
-  PyRun_SimpleString("SNR = 'SNR_' + NVF + ' value=%s' % round(snr, 1)");
+  PyRun_SimpleString("BLER = 'BLER_' + NVF + ' value=%s' %  round(BLERs, 4)");
+  PyRun_SimpleString("SNR = 'SNR_' + NVF + ' value=%s' % round(snr - 3, 1)");
   PyRun_SimpleString("iterations = 'iterations_' + NVF + ' value=%s' % iteration");
 
   PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=BLER)");
