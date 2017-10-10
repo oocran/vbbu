@@ -1,5 +1,7 @@
 #include <python2.7/Python.h>
 #include "srslte/oocran/monitoring.h"
+#include <stdio.h>
+
 
 PyObject *py_main;
 PyThreadState *pMainThreadState;
@@ -9,6 +11,10 @@ void oocran_monitoring_init(DB_credentials_t *q) {
   Py_Initialize();
   py_main = PyImport_AddModule("__main__");
   PyRun_SimpleString("import requests");
+  PyRun_SimpleString("import sys");
+  PyRun_SimpleString("import psutil");
+  PyRun_SimpleString("import os");
+  PyRun_SimpleString("import time");
 
   PyModule_AddStringConstant(py_main, "NVF", q->NVF);
   PyModule_AddStringConstant(py_main, "IP", q->ip);
@@ -16,7 +22,28 @@ void oocran_monitoring_init(DB_credentials_t *q) {
   PyModule_AddStringConstant(py_main, "USER", q->user);
   PyModule_AddStringConstant(py_main, "PASSWORD", q->pwd);
 
+  PyRun_SimpleString("interface = 'lo'");
+  PyRun_SimpleString("cpu = 0.0");
+  PyRun_SimpleString("ul = 0.00");
+  PyRun_SimpleString("dl = 0.00");
+  PyRun_SimpleString("t0 = time.time()");
+  PyRun_SimpleString("upload=psutil.net_io_counters(pernic=True)[interface][0]");
+  PyRun_SimpleString("download=psutil.net_io_counters(pernic=True)[interface][1]");
+  PyRun_SimpleString("up_down=(upload,download)");
+
   PyEval_InitThreads();
+  pMainThreadState = PyEval_SaveThread();
+}
+
+// store compute resources in DB
+void oocran_monitoring_compute(void) {
+  FILE* file;
+
+  PyEval_AcquireThread(pMainThreadState);
+
+  file = fopen("monitor.py","r");
+  PyRun_SimpleFile(file, "monitor.py");
+
   pMainThreadState = PyEval_SaveThread();
 }
 

@@ -572,6 +572,7 @@ int main(int argc, char **argv) {
 
   if (prog_args.influx_DB) {
 	  oocran_monitoring_init(&credentials);
+	  oocran_monitoring_compute();
   }
 
   INFO("\nEntering main loop...\n\n", 0);
@@ -705,6 +706,7 @@ int main(int argc, char **argv) {
         		monitor.SNR = 10*log10(rsrp/noise);
         		monitor.iterations = tc_iterations;
 				oocran_monitoring_UE(&monitor);
+				oocran_monitoring_compute();
         	}
 
         	sfn = 0;

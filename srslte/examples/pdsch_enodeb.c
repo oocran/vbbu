@@ -611,6 +611,7 @@ int main(int argc, char **argv) {
   if (influx_DB) {
 	  //write parameters to InfluxDB
 	  oocran_monitoring_init(&credentials);
+	  oocran_monitoring_compute();
   }
 
   sf_n_re = 2 * SRSLTE_CP_NORM_NSYMB * cell.nof_prb * SRSLTE_NRE;
@@ -740,6 +741,7 @@ int main(int argc, char **argv) {
 		  monitor.throughput = 1000*pdsch_cfg.grant.mcs.tbs;
 		  monitor.MCS = mcs_idx;
 		  oocran_monitoring_eNB(&monitor);
+		  oocran_monitoring_compute();
 	  }
 
       if (sf_idx == 0 || sf_idx == 5) {
