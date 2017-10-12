@@ -118,9 +118,10 @@ int prbset_num = 1, last_prbset_num = 1;
 int prbset_orig = 0; 
 
 bool influx_DB = false;
+bool conf_parser = false;
 
 void usage(char *prog) {
-  printf("Usage: %s [algmfoncvpsuEDNIUP]\n", prog);
+  printf("Usage: %s [algmfoncvpsuEDNIUPA]\n", prog);
 #ifndef DISABLE_RF
   printf("\t-a RF args [Default %s]\n", rf_args);
   printf("\t-l RF amplitude [Default %.2f]\n", rf_amp);
@@ -140,17 +141,20 @@ void usage(char *prog) {
   printf("\t-v [set srslte_verbose to debug, default none]\n");
   printf("\t===============================\n");
   printf("\tInfluxDB settings:\n");
-  printf("\t-E Enable monitoring and configuration [Default %s]\n", influx_DB?"Disabled":"Enabled");
+  printf("\t-E Enable monitoring module [Default %s]\n", influx_DB?"Disabled":"Enabled");
   printf("\t-D Database [Default %s]\n", credentials.name);
   printf("\t-N NVF [Default %s]\n", credentials.NVF);
   printf("\t-I IP address [Default %s]\n", credentials.ip);
   printf("\t-U User [Default %s]\n", credentials.user);
   printf("\t-P Password [Default %s]\n", credentials.pwd);
+  printf("\t===============================\n");
+  printf("\tReconfiguration settings:\n");
+  printf("\t-A Parse parameters from /etc/bbu/bbu.conf [Default %s]\n", conf_parser?"Disabled":"Enabled");
 }
 
 void parse_args(int argc, char **argv) {
   int opt;
-  while ((opt = getopt(argc, argv, "aglfmoncpvuisEDNIUP")) != -1) {
+  while ((opt = getopt(argc, argv, "aglfmoncpvuisEDNIUPA")) != -1) {
     switch (opt) {
     case 'a':
       rf_args = argv[optind];
@@ -214,6 +218,10 @@ void parse_args(int argc, char **argv) {
     case 'v':
       srslte_verbose++;
       break;
+    case 'A':
+	  conf_parser = true;
+	  influx_DB = true;
+	  break;
     default:
       usage(argv[0]);
       exit(-1);
@@ -611,6 +619,7 @@ int main(int argc, char **argv) {
   if (influx_DB) {
 	  //write parameters to InfluxDB
 	  oocran_monitoring_init(&credentials);
+	  oocran_monitoring_compute();
   }
 
   sf_n_re = 2 * SRSLTE_CP_NORM_NSYMB * cell.nof_prb * SRSLTE_NRE;
@@ -727,19 +736,24 @@ int main(int argc, char **argv) {
       bzero(sf_buffer, sizeof(cf_t) * sf_n_re);
 
 	  if (influx_DB && sfn == 0 && sf_idx == 0) {
-		  //write parameters to InfluxDB
 
-		  mcs_idx = oocran_reconfiguration_eNB();
-		  if ((mcs_idx != last_mcs_idx) && (mcs_idx >= 0) && (mcs_idx <= 31)) {
-		      printf("\n\nRECONFIGURATION - The MCS will be changed to: %d \n\n", mcs_idx);
-		      last_mcs_idx = mcs_idx;
-		      update_radl();
+		  if (conf_parser) {
+		    //reconfiguration with /etc/bbu/bbu.conf parameters
+		    mcs_idx = oocran_parse_tx();
+		    //mcs_idx = oocran_reconfiguration_eNB(); //to use with monitor.conf
+		    if ((mcs_idx != last_mcs_idx) && (mcs_idx >= 0) && (mcs_idx <= 31)) {
+		        printf("\n\nRECONFIGURATION - The MCS will be changed to: %d \n\n", mcs_idx);
+		        last_mcs_idx = mcs_idx;
+		        update_radl();
+		    }
 		  }
 
+		  //write metrics to InfluxDB
 		  monitor.RB_assigned = cell.nof_prb;
 		  monitor.throughput = 1000*pdsch_cfg.grant.mcs.tbs;
 		  monitor.MCS = mcs_idx;
 		  oocran_monitoring_eNB(&monitor);
+		  oocran_monitoring_compute();
 	  }
 
       if (sf_idx == 0 || sf_idx == 5) {

@@ -36,6 +36,12 @@ typedef struct SRSLTE_API {
 
 SRSLTE_API void oocran_monitoring_init(DB_credentials_t *q);
 
+SRSLTE_API void oocran_monitoring_compute(void);
+
+SRSLTE_API int oocran_parse_tx(void);
+
+SRSLTE_API int oocran_parse_rx(void);
+
 SRSLTE_API void oocran_monitoring_eNB(oocran_monitoring_eNB_t *q);
 
 SRSLTE_API void oocran_monitoring_UE(oocran_monitoring_UE_t *q);

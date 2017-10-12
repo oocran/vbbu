@@ -1,5 +1,7 @@
 #include <python2.7/Python.h>
 #include "srslte/oocran/monitoring.h"
+#include <stdio.h>
+
 
 PyObject *py_main;
 PyThreadState *pMainThreadState;
@@ -9,6 +11,11 @@ void oocran_monitoring_init(DB_credentials_t *q) {
   Py_Initialize();
   py_main = PyImport_AddModule("__main__");
   PyRun_SimpleString("import requests");
+  PyRun_SimpleString("import sys");
+  PyRun_SimpleString("import psutil");
+  PyRun_SimpleString("import os");
+  PyRun_SimpleString("import time");
+  PyRun_SimpleString("import ConfigParser");
 
   PyModule_AddStringConstant(py_main, "NVF", q->NVF);
   PyModule_AddStringConstant(py_main, "IP", q->ip);
@@ -16,8 +23,76 @@ void oocran_monitoring_init(DB_credentials_t *q) {
   PyModule_AddStringConstant(py_main, "USER", q->user);
   PyModule_AddStringConstant(py_main, "PASSWORD", q->pwd);
 
+  PyRun_SimpleString("interface = 'lo'");
+  PyRun_SimpleString("cpu = 0.0");
+  PyRun_SimpleString("ul = 0.00");
+  PyRun_SimpleString("dl = 0.00");
+  PyRun_SimpleString("t0 = time.time()");
+  PyRun_SimpleString("upload=psutil.net_io_counters(pernic=True)[interface][0]");
+  PyRun_SimpleString("download=psutil.net_io_counters(pernic=True)[interface][1]");
+  PyRun_SimpleString("up_down=(upload,download)");
+  PyRun_SimpleString("Config = ConfigParser.ConfigParser()");
+
   PyEval_InitThreads();
   pMainThreadState = PyEval_SaveThread();
+}
+
+// store compute resources in DB
+void oocran_monitoring_compute(void) {
+  FILE* file;
+
+  PyEval_AcquireThread(pMainThreadState);
+
+  file = fopen("../../../monitor.py","r");
+  PyRun_SimpleFile(file, "monitor.py");
+
+  pMainThreadState = PyEval_SaveThread();
+}
+
+// parse Tx parameters from /etc/bbu/bbu.conf
+int oocran_parse_tx(void) {
+  FILE* file;
+  PyObject *py_handler;
+  int MCS;
+
+  PyEval_AcquireThread(pMainThreadState);
+
+  if( access("/etc/bbu/bbu.conf", R_OK) != -1 ) {
+	  file = fopen("../../../parser_tx.py","r");
+	  PyRun_SimpleFile(file, "parser_tx.py");
+
+	  py_handler = PyObject_GetAttrString(py_main,"new_mcs");
+	  MCS = PyInt_AsLong(py_handler);
+  } else {
+	  MCS = 1;
+  }
+
+  pMainThreadState = PyEval_SaveThread();
+
+  return MCS;
+}
+
+// parse Rx parameters from /etc/bbu/bbu.conf
+int oocran_parse_rx(void) {
+  FILE* file;
+  PyObject *py_handler;
+  int iterations;
+
+  PyEval_AcquireThread(pMainThreadState);
+
+  if( access("/etc/bbu/bbu.conf", R_OK) != -1 ) {
+	  file = fopen("../../../parser_rx.py","r");
+	  PyRun_SimpleFile(file, "parser_rx.py");
+
+	  py_handler = PyObject_GetAttrString(py_main,"new_iterations");
+	  iterations = PyInt_AsLong(py_handler);
+  } else {
+	  iterations = 4;
+  }
+
+  pMainThreadState = PyEval_SaveThread();
+
+  return iterations;
 }
 
 // store eNB parameters in DB
@@ -51,8 +126,8 @@ void oocran_monitoring_UE(oocran_monitoring_UE_t *q) {
   PyModule_AddObject(py_main, "snr", py_SNR);
   PyModule_AddIntConstant(py_main, "iteration", q->iterations);
 
-  PyRun_SimpleString("BLER = 'BLER_' + NVF + ' value=%s' % BLERs");
-  PyRun_SimpleString("SNR = 'SNR_' + NVF + ' value=%s' % round(snr, 1)");
+  PyRun_SimpleString("BLER = 'BLER_' + NVF + ' value=%s' %  round(BLERs, 4)");
+  PyRun_SimpleString("SNR = 'SNR_' + NVF + ' value=%s' % round(snr - 3, 1)");
   PyRun_SimpleString("iterations = 'iterations_' + NVF + ' value=%s' % iteration");
 
   PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=BLER)");
