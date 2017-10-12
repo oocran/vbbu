@@ -15,6 +15,7 @@ void oocran_monitoring_init(DB_credentials_t *q) {
   PyRun_SimpleString("import psutil");
   PyRun_SimpleString("import os");
   PyRun_SimpleString("import time");
+  PyRun_SimpleString("import ConfigParser");
 
   PyModule_AddStringConstant(py_main, "NVF", q->NVF);
   PyModule_AddStringConstant(py_main, "IP", q->ip);
@@ -30,6 +31,7 @@ void oocran_monitoring_init(DB_credentials_t *q) {
   PyRun_SimpleString("upload=psutil.net_io_counters(pernic=True)[interface][0]");
   PyRun_SimpleString("download=psutil.net_io_counters(pernic=True)[interface][1]");
   PyRun_SimpleString("up_down=(upload,download)");
+  PyRun_SimpleString("Config = ConfigParser.ConfigParser()");
 
   PyEval_InitThreads();
   pMainThreadState = PyEval_SaveThread();
@@ -41,10 +43,56 @@ void oocran_monitoring_compute(void) {
 
   PyEval_AcquireThread(pMainThreadState);
 
-  file = fopen("monitor.py","r");
+  file = fopen("../../../monitor.py","r");
   PyRun_SimpleFile(file, "monitor.py");
 
   pMainThreadState = PyEval_SaveThread();
+}
+
+// parse Tx parameters from /etc/bbu/bbu.conf
+int oocran_parse_tx(void) {
+  FILE* file;
+  PyObject *py_handler;
+  int MCS;
+
+  PyEval_AcquireThread(pMainThreadState);
+
+  if( access("/etc/bbu/bbu.conf", R_OK) != -1 ) {
+	  file = fopen("../../../parser_tx.py","r");
+	  PyRun_SimpleFile(file, "parser_tx.py");
+
+	  py_handler = PyObject_GetAttrString(py_main,"new_mcs");
+	  MCS = PyInt_AsLong(py_handler);
+  } else {
+	  MCS = 1;
+  }
+
+  pMainThreadState = PyEval_SaveThread();
+
+  return MCS;
+}
+
+// parse Rx parameters from /etc/bbu/bbu.conf
+int oocran_parse_rx(void) {
+  FILE* file;
+  PyObject *py_handler;
+  int iterations;
+
+  PyEval_AcquireThread(pMainThreadState);
+
+  if( access("/etc/bbu/bbu.conf", R_OK) != -1 ) {
+	  file = fopen("../../../parser_rx.py","r");
+	  PyRun_SimpleFile(file, "parser_rx.py");
+
+	  py_handler = PyObject_GetAttrString(py_main,"new_iterations");
+	  iterations = PyInt_AsLong(py_handler);
+  } else {
+	  iterations = 4;
+  }
+
+  pMainThreadState = PyEval_SaveThread();
+
+  return iterations;
 }
 
 // store eNB parameters in DB

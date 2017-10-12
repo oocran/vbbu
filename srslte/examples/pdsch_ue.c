@@ -116,6 +116,7 @@ typedef struct {
   char *DB_NVF;
   char *DB_user;
   char *DB_pwd;
+  bool conf_parser;
 }prog_args_t;
 
 void args_default(prog_args_t *args) {
@@ -144,6 +145,7 @@ void args_default(prog_args_t *args) {
   args->net_port_signal = -1; 
   args->net_address_signal = "127.0.0.1";
   args->influx_DB = false;
+  args->conf_parser = false;
   args->DB_name = credentials.name;
   args->DB_ip = credentials.ip;
   args->DB_NVF = credentials.NVF;
@@ -187,18 +189,21 @@ void usage(prog_args_t *args, char *prog) {
   printf("\t-v [set srslte_verbose to debug, default none]\n");
   printf("\t===============================\n");
   printf("\tinfluxDB settings:\n");
-  printf("\t-E Enable monitoring and configuration [Default %s]\n", args->influx_DB?"Disabled":"Enabled");
+  printf("\t-E Enable monitoring module [Default %s]\n", args->influx_DB?"Disabled":"Enabled");
   printf("\t-B Database [Default %s]\n", args->DB_name);
   printf("\t-N NVF [Default %s]\n", args->DB_NVF);
   printf("\t-I IP address [Default %s]\n", args->DB_ip);
   printf("\t-R User [Default %s]\n", args->DB_user);
   printf("\t-W Password [Default %s]\n", args->DB_pwd);  
+  printf("\t===============================\n");
+  printf("\tReconfiguration settings:\n");
+  printf("\t-A Parse parameters from /etc/bbu/bbu.conf [Default %s]\n", args->conf_parser?"Disabled":"Enabled");
 }
 
 void parse_args(prog_args_t *args, int argc, char **argv) {
   int opt;
   args_default(args);
-  while ((opt = getopt(argc, argv, "aogliIpPcOCtdDnNvrRfuUsSEBW")) != -1) {
+  while ((opt = getopt(argc, argv, "aogliIpPcOCtdDnNvrRfuUsSEBWA")) != -1) {
     switch (opt) {
     case 'i':
       args->input_file_name = argv[optind];
@@ -286,6 +291,10 @@ void parse_args(prog_args_t *args, int argc, char **argv) {
     case 'W':
       args->DB_pwd = argv[optind];
       credentials.pwd = args->DB_pwd;
+      args->influx_DB = true;
+      break;
+    case 'A':
+      args->conf_parser = true;
       args->influx_DB = true;
       break;
     case 'v':
@@ -579,9 +588,10 @@ int main(int argc, char **argv) {
   /* Main loop */
   while (!go_exit && (sf_cnt < prog_args.nof_subframes || prog_args.nof_subframes == -1)) {
 
-	if (prog_args.influx_DB && sfn == 1000) {
-		//reconfigure number of turbo code iterations
-		tc_iterations = oocran_reconfiguration_UE();
+	if (prog_args.conf_parser && sfn == 1000) {
+		//reconfigure number of turbo code iterations /etc/bbu/bbu.conf
+		tc_iterations = oocran_parse_rx();
+		//tc_iterations = oocran_reconfiguration_UE();
 
 		if ((tc_iterations != monitor.iterations) && (tc_iterations >= 1) && (tc_iterations <= 10)) {
 			printf("\nRECONFIGURATION - The number of turbo code iterations will be changed to: %d \n", tc_iterations);
