@@ -32,6 +32,7 @@ typedef struct SRSLTE_API {
   double SNR;
   double BLER;
   int iterations;
+  double percentCPU;
 } oocran_monitoring_UE_t;
 
 SRSLTE_API void oocran_monitoring_init(DB_credentials_t *q);

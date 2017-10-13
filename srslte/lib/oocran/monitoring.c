@@ -116,23 +116,27 @@ void oocran_monitoring_eNB(oocran_monitoring_eNB_t *q) {
 
 // store UE parameters in DB
 void oocran_monitoring_UE(oocran_monitoring_UE_t *q) {
-  PyObject *py_BLER, *py_SNR;
+  PyObject *py_BLER, *py_SNR, *py_percentCPU;
 
   PyEval_AcquireThread(pMainThreadState);
 
   py_BLER = Py_BuildValue("d", q->BLER);
   py_SNR = Py_BuildValue("d", q->SNR);
+  py_percentCPU = Py_BuildValue("d", q->percentCPU);
   PyModule_AddObject(py_main, "BLERs", py_BLER);
   PyModule_AddObject(py_main, "snr", py_SNR);
+  PyModule_AddObject(py_main, "percentCPU", py_percentCPU);
   PyModule_AddIntConstant(py_main, "iteration", q->iterations);
 
   PyRun_SimpleString("BLER = 'BLER_' + NVF + ' value=%s' %  round(BLERs, 4)");
-  PyRun_SimpleString("SNR = 'SNR_' + NVF + ' value=%s' % round(snr - 3, 1)");
+  PyRun_SimpleString("SNR = 'SNR_' + NVF + ' value=%s' % round(snr, 1)");
+  PyRun_SimpleString("percentCPU = 'percentCPU_' + NVF + ' value=%s' % percentCPU");
   PyRun_SimpleString("iterations = 'iterations_' + NVF + ' value=%s' % iteration");
 
   PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=BLER)");
   PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=SNR)");
   PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=iterations)");
+  PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=percentCPU)");
 
   pMainThreadState = PyEval_SaveThread();
 }
@@ -151,7 +155,7 @@ int oocran_reconfiguration_eNB(void) {
 	  py_handler = PyObject_GetAttrString(py_main,"mcs");
 	  MCS = PyInt_AsLong(py_handler);
   } else {
-	  MCS = 1;
+	  MCS = 6;
   }
 
   pMainThreadState = PyEval_SaveThread();
@@ -173,7 +177,7 @@ int oocran_reconfiguration_UE(void) {
 	  py_handler = PyObject_GetAttrString(py_main,"tc_iterations");
 	  iterations = PyInt_AsLong(py_handler);
   } else {
-	  iterations = 4;
+	  iterations = 1;
   }
 
   pMainThreadState = PyEval_SaveThread();
