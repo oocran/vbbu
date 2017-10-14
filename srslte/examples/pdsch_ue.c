@@ -62,7 +62,8 @@ oocran_monitoring_UE_t monitor = {
   30.0,				//SNR
   0.0,				//BLER
   1,					//turbo code iterations (SRSLTE_PDSCH_MAX_TDEC_ITERS)
-  0.0         //percentCPU
+  0.0,        //percentCPU
+  0           //throughput_UE
 };
 
 DB_credentials_t credentials = {
@@ -712,7 +713,7 @@ int main(int argc, char **argv) {
 			srslte_sch_set_max_noi(&ue_dl.pdsch.dl_sch, (uint32_t)tc_iterations);
 			monitor.iterations = tc_iterations;
 		}
-		printf("\nAverage number of iterations: %f \n", ue_dl.pdsch.dl_sch.average_nof_iterations);
+		//printf("\nAverage number of iterations: %f \n", ue_dl.pdsch.dl_sch.average_nof_iterations);
 	}
 
     ret = srslte_ue_sync_get_buffer(&ue_sync, &sf_buffer);
@@ -877,10 +878,11 @@ int main(int argc, char **argv) {
             monitor.SNR = 10*log10(rsrp/noise)-3.0;
             monitor.iterations = tc_iterations;
             monitor.percentCPU = averpercentCPU;
+            monitor.throughput_UE = 1000*ue_dl.pdsch_cfg.grant.mcs.tbs;
 
 //float srslte_pdsch_average_noi(srslte_pdsch_t *q) 
-printf("BLER=%5.4f, SNR=%5.2f, iterations=%d, percentCPU=%5.2f%\n", 
-        monitor.BLER, monitor.SNR, monitor.iterations, monitor.percentCPU);
+printf("BLER=%5.4f, SNR=%5.2f, iterations=%d, percentCPU=%5.2f%, throughput=%d\n", 
+        monitor.BLER, monitor.SNR, monitor.iterations, monitor.percentCPU, monitor.throughput_UE);
 //printf("BLER=%5.3f, SNR=%5.3f, ue_dl.pdsch.dl_sch.average_nof_iterations=%d\n", monitor.BLER, monitor.SNR, ue_dl.pdsch.dl_sch.average_nof_iterations);
 
 

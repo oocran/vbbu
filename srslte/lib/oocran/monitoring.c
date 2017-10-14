@@ -127,16 +127,19 @@ void oocran_monitoring_UE(oocran_monitoring_UE_t *q) {
   PyModule_AddObject(py_main, "snr", py_SNR);
   PyModule_AddObject(py_main, "percentCPU", py_percentCPU);
   PyModule_AddIntConstant(py_main, "iteration", q->iterations);
+  PyModule_AddIntConstant(py_main, "throughput_UE", q->throughput_UE);
 
   PyRun_SimpleString("BLER = 'BLER_' + NVF + ' value=%s' %  round(BLERs, 4)");
   PyRun_SimpleString("SNR = 'SNR_' + NVF + ' value=%s' % round(snr, 1)");
   PyRun_SimpleString("percentCPU = 'percentCPU_' + NVF + ' value=%s' % percentCPU");
   PyRun_SimpleString("iterations = 'iterations_' + NVF + ' value=%s' % iteration");
+  PyRun_SimpleString("throughputUE = 'throughputUE_' + NVF + ' value=%s' % throughput_UE");
 
   PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=BLER)");
   PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=SNR)");
   PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=iterations)");
   PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=percentCPU)");
+  PyRun_SimpleString("requests.post('http://%s:8086/write?db=%s' % (IP, DB), auth=(USER, PASSWORD), data=throughputUE)");
 
   pMainThreadState = PyEval_SaveThread();
 }
