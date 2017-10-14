@@ -50,6 +50,7 @@ srslte_rf_t rf;
 
 char *output_file_name = NULL;
 char *input_file_name = NULL;
+char *log_file_name = NULL;
 
 #define LEFT_KEY  68
 #define RIGHT_KEY 67
@@ -90,6 +91,7 @@ float SNR = 10.0;
 char *rf_args = "";
 float rf_amp = 0.8, rf_gain = 70.0, rf_freq = 2400000000;
 
+FILE *stream;
 bool null_file_sink=false; 
 srslte_filesink_t fsink;
 srslte_filesource_t fsource; //input data file
@@ -121,7 +123,7 @@ bool influx_DB = false;
 bool conf_parser = false;
 
 void usage(char *prog) {
-  printf("Usage: %s [algmfoncvpsuEDNIUPA]\n", prog);
+  printf("Usage: %s [algmfoncvpsuFEDNIUPA]\n", prog);
 #ifndef DISABLE_RF
   printf("\t-a RF args [Default %s]\n", rf_args);
   printf("\t-l RF amplitude [Default %.2f]\n", rf_amp);
@@ -139,6 +141,7 @@ void usage(char *prog) {
   printf("\t-s SNR [Default %d dB]\n", SNR);
   printf("\t-u listen TCP port for input data (-1 is random) [Default %d]\n", net_port);
   printf("\t-v [set srslte_verbose to debug, default none]\n");
+  printf("\t-F log file [Default 'stdout']\n");
   printf("\t===============================\n");
   printf("\tInfluxDB settings:\n");
   printf("\t-E Enable monitoring module [Default %s]\n", influx_DB?"Disabled":"Enabled");
@@ -154,7 +157,7 @@ void usage(char *prog) {
 
 void parse_args(int argc, char **argv) {
   int opt;
-  while ((opt = getopt(argc, argv, "aglfmoncpvuisEDNIUPA")) != -1) {
+  while ((opt = getopt(argc, argv, "aglfmoncpvuisFEDNIUPA")) != -1) {
     switch (opt) {
     case 'a':
       rf_args = argv[optind];
@@ -192,9 +195,12 @@ void parse_args(int argc, char **argv) {
     case 's':
       SNR = atof(argv[optind]);
       break;
+    case 'F':
+      log_file_name = argv[optind];
+      break;
     case 'E':
-	  influx_DB = true;
-	  break;
+	    influx_DB = true;
+	    break;
     case 'D':
       credentials.name = argv[optind];
       influx_DB = true;
@@ -596,7 +602,7 @@ int main(int argc, char **argv) {
   srslte_dci_location_t locations[SRSLTE_NSUBFRAMES_X_FRAME][30];
   uint32_t sfn; 
   srslte_chest_dl_t est; 
-  uint32_t tc_iterations;
+  //uint32_t tc_iterations;
   int srate;
   float gain, signal_power, noise_power;
 
@@ -620,6 +626,14 @@ int main(int argc, char **argv) {
 	  //write parameters to InfluxDB
 	  oocran_monitoring_init(&credentials);
 	  oocran_monitoring_compute();
+  }
+
+  /* redirect stdout to file */
+  if (log_file_name) {
+    if((stream = freopen(log_file_name, "w", stdout)) == NULL) {
+      fprintf(stderr, "Error opening log file %s\n", log_file_name);
+      exit(-1);
+    }
   }
 
   sf_n_re = 2 * SRSLTE_CP_NORM_NSYMB * cell.nof_prb * SRSLTE_NRE;
@@ -726,7 +740,7 @@ int main(int argc, char **argv) {
   bool start_of_burst = true; 
 #endif
 
-  srslte_sch_set_max_noi(&pdsch.dl_sch, tc_iterations);
+  //srslte_sch_set_max_noi(&pdsch.dl_sch, tc_iterations);
   
   SNR = pow(10, SNR/10);
 
@@ -892,6 +906,11 @@ int main(int argc, char **argv) {
   }
 
   base_free();
+
+  /* redirect output to stdout */
+  if (log_file_name) {
+    stream = freopen("CON", "w", stdout);
+  }
 
   printf("Done\n");
   exit(0);

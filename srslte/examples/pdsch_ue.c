@@ -101,6 +101,7 @@ typedef struct {
   int force_N_id_2;
   uint16_t rnti;
   char *input_file_name;
+  char *log_file_name;
   int file_offset_time; 
   float file_offset_freq;
   uint32_t file_nof_prb;
@@ -129,6 +130,7 @@ void args_default(prog_args_t *args) {
   args->rnti = SRSLTE_SIRNTI;
   args->force_N_id_2 = -1; // Pick the best
   args->input_file_name = NULL;
+  args->log_file_name = NULL;
   args->disable_cfo = false; 
   args->time_offset = 0; 
   args->file_nof_prb = 25; 
@@ -156,8 +158,10 @@ void args_default(prog_args_t *args) {
   args->DB_pwd = credentials.pwd;
 }
 
+FILE *stream;
+
 void usage(prog_args_t *args, char *prog) {
-  printf("Usage: %s [agpPoOcildDnruvEBNIRW] -f rx_frequency (in Hz) | -i input_file\n", prog);
+  printf("Usage: %s [agpPoOcildDnruvFEBNIRW] -f rx_frequency (in Hz) | -i input_file\n", prog);
 #ifndef DISABLE_RF
   printf("\t-a RF args [Default %s]\n", args->rf_args);
 #ifdef ENABLE_AGC_DEFAULT
@@ -190,6 +194,7 @@ void usage(prog_args_t *args, char *prog) {
   printf("\t-u remote TCP port to send data (-1 does nothing with it) [Default %d]\n", args->net_port);
   printf("\t-U remote TCP address to send data [Default %s]\n", args->net_address);
   printf("\t-v [set srslte_verbose to debug, default none]\n");
+  printf("\t-i wrtie to log file [Default 'stdout']\n");
   printf("\t===============================\n");
   printf("\tinfluxDB settings:\n");
   printf("\t-E Enable monitoring module [Default %s]\n", args->influx_DB?"Disabled":"Enabled");
@@ -206,7 +211,7 @@ void usage(prog_args_t *args, char *prog) {
 void parse_args(prog_args_t *args, int argc, char **argv) {
   int opt;
   args_default(args);
-  while ((opt = getopt(argc, argv, "aogliIpPcOCtdDnNvrRfuUsSEBWA")) != -1) {
+  while ((opt = getopt(argc, argv, "aogliIpPcOCtdDnNvrRfuUsSEBWAF")) != -1) {
     switch (opt) {
     case 'i':
       args->input_file_name = argv[optind];
@@ -267,6 +272,9 @@ void parse_args(prog_args_t *args, int argc, char **argv) {
       break;
     case 'D':
       args->disable_plots_except_constellation = true;
+      break;
+    case 'F':
+      args->log_file_name = argv[optind];
       break;
     case 'E':
       args->influx_DB = true;
@@ -465,6 +473,17 @@ int main(int argc, char **argv) {
   uint32_t tc_iterations = 1;
   short reconf_count = 0;
 
+  //parse arguments
+  parse_args(&prog_args, argc, argv);
+
+  // redirect stdout to file
+  if (prog_args.log_file_name) {
+    if((stream = freopen(prog_args.log_file_name, "w", stdout)) == NULL) {
+      fprintf(stderr, "Error opening log file %s\n", prog_args.log_file_name);
+      exit(-1);
+    }
+  }
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////
   //CHECK PROCESSOR's COMPUTING CAPACITY
   struct timespec current1, current2;
@@ -477,9 +496,6 @@ int main(int argc, char **argv) {
 //  printf("num_operations=%ld, measured MOPS=%3.1f, numNS=%ld\n", numOPs, (float)(numMOPS), numNS);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  //parse arguments
-  parse_args(&prog_args, argc, argv);
 
   if (prog_args.net_port > 0) {
     if (srslte_netsink_init(&net_sink, prog_args.net_address, prog_args.net_port, SRSLTE_NETSINK_TCP)) {
@@ -652,7 +668,6 @@ int main(int argc, char **argv) {
   
   /* Initialize subframe counter */
   sf_cnt = 0;
-
 
 #ifndef DISABLE_GRAPHICS
   if (!prog_args.disable_plots) {
@@ -833,6 +848,7 @@ int main(int argc, char **argv) {
             }        
           }
 
+
           // Plot and Printf
           if (srslte_ue_sync_get_sfidx(&ue_sync) == 5) {
             float gain = prog_args.rf_gain; 
@@ -885,8 +901,8 @@ printf("BLER=%5.4f, SNR=%5.2f, iterations=%d, percentCPU=%5.2f%, throughput=%d\n
         monitor.BLER, monitor.SNR, monitor.iterations, monitor.percentCPU, monitor.throughput_UE);
 //printf("BLER=%5.3f, SNR=%5.3f, ue_dl.pdsch.dl_sch.average_nof_iterations=%d\n", monitor.BLER, monitor.SNR, ue_dl.pdsch.dl_sch.average_nof_iterations);
 
-
 //printf("averpercentCPU=%3.2f\n", averpercentCPU);
+
 ///////////////////////////////
 
         	if (prog_args.influx_DB) {
@@ -963,6 +979,11 @@ printf("BLER=%5.4f, SNR=%5.2f, iterations=%d, percentCPU=%5.2f%, throughput=%d\n
 
   if (prog_args.influx_DB) {
     oocran_monitoring_exit();
+  }
+
+  /* redirect output to stdout */
+  if (prog_args.log_file_name) {
+    stream = freopen("CON", "w", stdout);
   }
 
   exit(0);
