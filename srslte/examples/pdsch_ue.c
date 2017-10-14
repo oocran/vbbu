@@ -29,6 +29,7 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
+#include <time.h>
 #include <math.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -60,7 +61,8 @@ cell_search_cfg_t cell_detect_config = {
 oocran_monitoring_UE_t monitor = {
   30.0,				//SNR
   0.0,				//BLER
-  4					//turbo code iterations (SRSLTE_PDSCH_MAX_TDEC_ITERS)
+  1,					//turbo code iterations (SRSLTE_PDSCH_MAX_TDEC_ITERS)
+  0.0         //percentCPU
 };
 
 DB_credentials_t credentials = {
@@ -116,6 +118,7 @@ typedef struct {
   char *DB_NVF;
   char *DB_user;
   char *DB_pwd;
+  bool conf_parser;
 }prog_args_t;
 
 void args_default(prog_args_t *args) {
@@ -144,6 +147,7 @@ void args_default(prog_args_t *args) {
   args->net_port_signal = -1; 
   args->net_address_signal = "127.0.0.1";
   args->influx_DB = false;
+  args->conf_parser = false;
   args->DB_name = credentials.name;
   args->DB_ip = credentials.ip;
   args->DB_NVF = credentials.NVF;
@@ -187,18 +191,21 @@ void usage(prog_args_t *args, char *prog) {
   printf("\t-v [set srslte_verbose to debug, default none]\n");
   printf("\t===============================\n");
   printf("\tinfluxDB settings:\n");
-  printf("\t-E Enable monitoring and configuration [Default %s]\n", args->influx_DB?"Disabled":"Enabled");
+  printf("\t-E Enable monitoring module [Default %s]\n", args->influx_DB?"Disabled":"Enabled");
   printf("\t-B Database [Default %s]\n", args->DB_name);
   printf("\t-N NVF [Default %s]\n", args->DB_NVF);
   printf("\t-I IP address [Default %s]\n", args->DB_ip);
   printf("\t-R User [Default %s]\n", args->DB_user);
   printf("\t-W Password [Default %s]\n", args->DB_pwd);  
+  printf("\t===============================\n");
+  printf("\tReconfiguration settings:\n");
+  printf("\t-A Parse parameters from /etc/bbu/bbu.conf [Default %s]\n", args->conf_parser?"Disabled":"Enabled");
 }
 
 void parse_args(prog_args_t *args, int argc, char **argv) {
   int opt;
   args_default(args);
-  while ((opt = getopt(argc, argv, "aogliIpPcOCtdDnNvrRfuUsSEBW")) != -1) {
+  while ((opt = getopt(argc, argv, "aogliIpPcOCtdDnNvrRfuUsSEBWA")) != -1) {
     switch (opt) {
     case 'i':
       args->input_file_name = argv[optind];
@@ -288,6 +295,10 @@ void parse_args(prog_args_t *args, int argc, char **argv) {
       credentials.pwd = args->DB_pwd;
       args->influx_DB = true;
       break;
+    case 'A':
+      args->conf_parser = true;
+      args->influx_DB = true;
+      break;
     case 'v':
       srslte_verbose++;
       break;
@@ -301,6 +312,97 @@ void parse_args(prog_args_t *args, int argc, char **argv) {
     exit(-1);
   }
 }
+
+////////////////////////////////////////////////////////////////////////
+
+int execMOPS(long int numMOPs){
+  long int j;
+  float xf;
+  numMOPs = numMOPs/4;
+//  printf("numOPs=%ld\n", numMOPs);
+  xf=1.0;
+  for (j = 0; j < numMOPs; j++) {
+    xf =33.0 * xf;
+    xf = xf + 33.0;
+    xf = xf / 33.0;
+    xf = xf - 46.0;
+  }
+  return(xf);
+}
+
+void measureMOPS_0(long int num_operations, int *numMOPS, long int *numNS){
+
+  float outf=0.0;
+  struct timespec current, current1, current2;
+  long int time1_ns, time2_ns;
+  float x;
+  
+//  printf(".................measureMACS_0 NumOps=%ld \n", (long int)num_operations);
+  clock_gettime(CLOCK_MONOTONIC, &current1);
+  time1_ns=((long int)current1.tv_sec)*1000000000 + (long int)current1.tv_nsec;
+  x=execMOPS((long int)num_operations);
+  clock_gettime(CLOCK_MONOTONIC, &current2);
+  time2_ns=((long int)current2.tv_sec)*1000000000 + (long int)current2.tv_nsec;
+//  printf("time1=%ld, time2=%ld, diff=%ld\n",time1_ns, time2_ns, time2_ns-time1_ns);
+
+//  current.tv_sec = current2.tv_sec - current1.tv_sec;
+//  current.tv_nsec = current2.tv_nsec - current1.tv_nsec;
+
+//  printf("x=%3.2f\n", x);
+
+
+  *numMOPS=(int)((float)(num_operations)*1000.0/(float)(time2_ns-time1_ns));
+  *numNS=(time2_ns-time1_ns);
+//  printf("num_operations=%ld, measured MOPS=%3.1f, numNS=%ld\n", num_operations, (float)(*numMOPS), time2_ns-time1_ns);
+  printf("/////////////////////////////////////////////%3.2f\n", x);
+  printf("Measured MOPS=%3.1f\n", (float)(*numMOPS));
+  printf("/////////////////////////////////////////////%3.2f\n", x);
+  //Return out value only for wait till result available purposes
+}
+
+
+
+float averbuffer0[1024*16];
+float averpercentCPU=0;
+float windowAverage(float inputdata, int windowlength, float *buffer){
+
+  int i;
+  static int first=0;
+  float average=0.0;
+  static int counter=0;
+  static float mbuffer[1024];
+
+  if(first==0){
+    for(i=0; i<windowlength; i++){
+      *(mbuffer+i)=0;
+    }
+    first=1;
+  }else{
+    for(i=windowlength-2; i>=0; i--){
+
+//      printf("Abuffer[%d]=%3.3f, buffer[%d]=%3.3f\n", i, mbuffer[i], i+1, mbuffer[i+1]);
+      *(mbuffer+i+1)=*(mbuffer+i);
+//      printf("Bbuffer[%d]=%3.3f, buffer[%d]=%3.3f\n", i, mbuffer[i], i+1, mbuffer[i+1]);
+
+    }
+//    printf("buffer[0]=%3.3f, buffer[1]=%3.3f, buffer[2]=%3.3f, buffer[3]=%3.3f,buffer[4]=%3.3f\n", 
+//            mbuffer[0], mbuffer[1],mbuffer[2],mbuffer[3],mbuffer[4]);
+  }
+  mbuffer[0]=inputdata;
+  average=0.0;
+  for(i=0; i<windowlength; i++){
+      average+=*(mbuffer+i);
+  }
+  counter++;
+  if(counter==50){
+    counter=0;
+//    printf("average=%3.3f, \n", (average/(float)windowlength)*100);
+  }
+  return(average/(float)windowlength);
+}
+
+
+////////////////////////////////////////////////////////////////////////
 /**********************************************************************/
 
 /* TODO: Do something with the output data */
@@ -352,12 +454,28 @@ int main(int argc, char **argv) {
   uint8_t bch_payload[SRSLTE_BCH_PAYLOAD_LEN];
   int sfn_offset;
   float cfo = 0, BLER = 0.0; 
+#define NUNAVER 1024
+  float _BLER[NUNAVER];  
+  int idxBLER=0;
   //char BLER_s[50];
   srslte_filesink_t logsink; //log control
 
   // PyObject *py_main, *py_handler;
-  uint32_t tc_iterations;
+  uint32_t tc_iterations = 1;
   short reconf_count = 0;
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+  //CHECK PROCESSOR's COMPUTING CAPACITY
+  struct timespec current1, current2;
+  long int time1_ns, time2_ns;
+  float percentCPU=0;
+  int numMOPS=0;
+  long int numNS=0;
+  long int numOPs=10000000;
+  measureMOPS_0(numOPs, &numMOPS, &numNS);
+//  printf("num_operations=%ld, measured MOPS=%3.1f, numNS=%ld\n", numOPs, (float)(numMOPS), numNS);
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
 
   //parse arguments
   parse_args(&prog_args, argc, argv);
@@ -572,22 +690,29 @@ int main(int argc, char **argv) {
 
   if (prog_args.influx_DB) {
 	  oocran_monitoring_init(&credentials);
+	  oocran_monitoring_compute();
   }
 
   INFO("\nEntering main loop...\n\n", 0);
   /* Main loop */
   while (!go_exit && (sf_cnt < prog_args.nof_subframes || prog_args.nof_subframes == -1)) {
 
-	if (prog_args.influx_DB && sfn == 1000) {
-		//reconfigure number of turbo code iterations
-		tc_iterations = oocran_reconfiguration_UE();
+//////////////////////////////////////////////////////////////////////////////////
+//  clock_gettime(CLOCK_MONOTONIC, &current1);
+//  time1_ns=((long int)current1.tv_sec)*1000000000 + (long int)current1.tv_nsec;
+//////////////////////////////////////////////////////////////////////////////////
+
+	if (prog_args.conf_parser && sfn == 1000) {
+		//reconfigure number of turbo code iterations /etc/bbu/bbu.conf
+		tc_iterations = oocran_parse_rx();
+		//tc_iterations = oocran_reconfiguration_UE();
 
 		if ((tc_iterations != monitor.iterations) && (tc_iterations >= 1) && (tc_iterations <= 10)) {
 			printf("\nRECONFIGURATION - The number of turbo code iterations will be changed to: %d \n", tc_iterations);
 			srslte_sch_set_max_noi(&ue_dl.pdsch.dl_sch, (uint32_t)tc_iterations);
 			monitor.iterations = tc_iterations;
 		}
-		//printf("\nAverage number of iterations: %f \n", ue_dl.pdsch.dl_sch.average_nof_iterations);
+		printf("\nAverage number of iterations: %f \n", ue_dl.pdsch.dl_sch.average_nof_iterations);
 	}
 
     ret = srslte_ue_sync_get_buffer(&ue_sync, &sf_buffer);
@@ -619,6 +744,13 @@ int main(int argc, char **argv) {
           }
           break;
         case DECODE_PDSCH:
+
+//2///////////////////////////////////////////////////////////////////////////////
+  clock_gettime(CLOCK_MONOTONIC, &current1);
+  time1_ns=((long int)current1.tv_sec)*1000000000 + (long int)current1.tv_nsec;
+//////////////////////////////////////////////////////////////////////////////////
+
+
           if (prog_args.rnti != SRSLTE_SIRNTI) {
             decode_pdsch = true;             
           } else {
@@ -629,13 +761,35 @@ int main(int argc, char **argv) {
               decode_pdsch = false; 
             }
           }
-          if (decode_pdsch) {            
+          if (decode_pdsch) {    
+
+/*
+//1///////////////////////////////////////////////////////////////////////////////
+  clock_gettime(CLOCK_MONOTONIC, &current1);
+  time1_ns=((long int)current1.tv_sec)*1000000000 + (long int)current1.tv_nsec;
+//////////////////////////////////////////////////////////////////////////////////
+*/
+
             INFO("Attempting DL decode SFN=%d\n", sfn);
             n = srslte_ue_dl_decode(&ue_dl, 
                                     &sf_buffer[prog_args.time_offset], 
                                     data, 
                                     sfn*10+srslte_ue_sync_get_sfidx(&ue_sync));
-          
+
+/*
+//1///////////////////////////////////////////////////////////////////////////////
+  clock_gettime(CLOCK_MONOTONIC, &current2);
+  time2_ns=((long int)current2.tv_sec)*1000000000 + (long int)current2.tv_nsec;
+  percentCPU=((float)(time2_ns-time1_ns)/1000000.0)*100.0;  //Should be executed in 1ms
+//  printf("percentCPU=%3.2f, diff_ns=%ld\n", percentCPU, time2_ns-time1_ns);
+  time2_ns=0;
+  time1_ns=0;
+  averpercentCPU=windowAverage(percentCPU, 512, averbuffer0);
+//if(sfn==3)exit(0);
+//  printf("averpercentCPU=%3.2f\n", averpercentCPU);
+//////////////////////////////////////////////////////////////////////////////////
+*/
+
             if (n < 0) {
              // fprintf(stderr, "Error decoding UE DL\n");fflush(stdout);
             } else if (n > 0) {
@@ -684,27 +838,59 @@ int main(int argc, char **argv) {
             if (gain < 0) {
               gain = 10*log10(srslte_agc_get_gain(&ue_sync.agc)); 
             }
-	    BLER = (float) 100*ue_dl.pkt_errors/ue_dl.pkts_total;
-            printf("CFO: %+6.2f kHz, "
+            BLER = (float) ue_dl.pkt_errors/ue_dl.pkts_total;
+            _BLER[idxBLER]=BLER;
+            idxBLER++;
+	    //BLER = (float) 100*ue_dl.pkt_errors/ue_dl.pkts_total;
+/*            printf("CFO: %+6.2f kHz, "
                    "SNR: %4.1f dB, "
                    "PDCCH-Miss: %5.2f%%, PDSCH-BLER: %5.2f%%\r",                 
                   srslte_ue_sync_get_cfo(&ue_sync)/1000,
                   10*log10(rsrp/noise), 
                   100*(1-(float) ue_dl.nof_detected/nof_trials), 
-                  BLER);                    
+                  BLER);     
+*/               
           }
+
+
+//2///////////////////////////////////////////////////////////////////////////////
+  clock_gettime(CLOCK_MONOTONIC, &current2);
+  time2_ns=((long int)current2.tv_sec)*1000000000 + (long int)current2.tv_nsec;
+  percentCPU=((float)(time2_ns-time1_ns)/1000000.0)*100.0;  //Should be executed in 1ms
+//  printf("percentCPU=%3.2f, diff_ns=%ld\n", percentCPU, time2_ns-time1_ns);
+  time2_ns=0;
+  time1_ns=0;
+  averpercentCPU=windowAverage(percentCPU, 512, averbuffer0);
+//if(sfn==3)exit(0);
+//  printf("averpercentCPU=%3.2f\n", averpercentCPU);
+//////////////////////////////////////////////////////////////////////////////////
+
+
           break;
       }
       if (srslte_ue_sync_get_sfidx(&ue_sync) == 9) {
         sfn++; 
         if (sfn == 1024) {
 
+////////////////////////////
+            monitor.BLER = BLER;
+            monitor.SNR = 10*log10(rsrp/noise)-3.0;
+            monitor.iterations = tc_iterations;
+            monitor.percentCPU = averpercentCPU;
+
+//float srslte_pdsch_average_noi(srslte_pdsch_t *q) 
+printf("BLER=%5.4f, SNR=%5.2f, iterations=%d, percentCPU=%5.2f%\n", 
+        monitor.BLER, monitor.SNR, monitor.iterations, monitor.percentCPU);
+//printf("BLER=%5.3f, SNR=%5.3f, ue_dl.pdsch.dl_sch.average_nof_iterations=%d\n", monitor.BLER, monitor.SNR, ue_dl.pdsch.dl_sch.average_nof_iterations);
+
+
+//printf("averpercentCPU=%3.2f\n", averpercentCPU);
+///////////////////////////////
+
         	if (prog_args.influx_DB) {
 				//store UE parameters in influxDB
-        		monitor.BLER = BLER;
-        		monitor.SNR = 10*log10(rsrp/noise);
-        		monitor.iterations = tc_iterations;
-				oocran_monitoring_UE(&monitor);
+				    oocran_monitoring_UE(&monitor);
+				    oocran_monitoring_compute();
         	}
 
         	sfn = 0;
@@ -738,7 +924,20 @@ int main(int argc, char **argv) {
       }
       #endif
     }
-        
+ 
+//////////////////////////////////////////////////////////////////////////////////
+/*  clock_gettime(CLOCK_MONOTONIC, &current2);
+  time2_ns=((long int)current2.tv_sec)*1000000000 + (long int)current2.tv_nsec;
+  percentCPU=((float)(time2_ns-time1_ns)/1000000.0)*100.0;  //Should be execute in 1ms
+//  printf("percentCPU=%3.2f, diff_ns=%ld\n", percentCPU, time2_ns-time1_ns);
+  time2_ns=0;
+  time1_ns=0;
+  averpercentCPU=windowAverage(percentCPU, 100, averbuffer0);
+  printf("averpercentCPU=%3.2f\n", averpercentCPU);*/
+//////////////////////////////////////////////////////////////////////////////////
+
+
+               
     sf_cnt++;                  
   } // Main loop
   
