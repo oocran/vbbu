@@ -467,12 +467,18 @@ int main(int argc, char **argv) {
   float _BLER[NUNAVER];  
   int idxBLER=0;
   //char BLER_s[50];
-  srslte_filesink_t logsink; //log control
+  //srslte_filesink_t logsink; //log control
 
   // PyObject *py_main, *py_handler;
   uint32_t tc_iterations = 1;
   short reconf_count = 0;
 
+  uint32_t last_noi;
+  long hist_iterations[10];
+
+  for (short j=0; j<10; j++) {
+	  hist_iterations[j] = 0;
+  }
   //parse arguments
   parse_args(&prog_args, argc, argv);
 
@@ -514,11 +520,11 @@ int main(int argc, char **argv) {
   }
   
   /* open log file */
-  if (srslte_filesink_init(&logsink, "log_ue.txt", SRSLTE_CHAR)) {
+  /*if (srslte_filesink_init(&logsink, "log_ue.txt", SRSLTE_CHAR)) {
 	  fprintf(stderr, "Error opening log file %s\n", "log_ue.txt");
 	  exit(-1);
-  }
-  fprintf(logsink.f,"%s","UE log control\n==================\n\n");
+  }*/
+  //fprintf(logsink.f,"%s","UE log control\n==================\n\n");
 
 #ifndef DISABLE_RF
   if (!prog_args.input_file_name) {
@@ -528,19 +534,19 @@ int main(int argc, char **argv) {
       fprintf(stderr, "Error opening rf\n");
       exit(-1);
     }
-    fprintf(logsink.f,"%s","RF device opened successfully\n");
+    //fprintf(logsink.f,"%s","RF device opened successfully\n");
 
     /* Set receiver gain */
     if (prog_args.rf_gain > 0) {
       srslte_rf_set_rx_gain(&rf, prog_args.rf_gain);
-      fprintf(logsink.f,"%s","Rx gain set successfully\n");
+      //fprintf(logsink.f,"%s","Rx gain set successfully\n");
     } else {
       printf("Starting AGC thread...\n");
       if (srslte_rf_start_gain_thread(&rf, false)) {
         fprintf(stderr, "Error opening rf\n");
         exit(-1);
       }
-      fprintf(logsink.f,"%s","AGC thread started\n");
+      //fprintf(logsink.f,"%s","AGC thread started\n");
       srslte_rf_set_rx_gain(&rf, 50);      
       cell_detect_config.init_agc = 50; 
     }
@@ -558,7 +564,7 @@ int main(int argc, char **argv) {
     srslte_rf_set_rx_freq(&rf, prog_args.rf_freq);
     srslte_rf_rx_wait_lo_locked(&rf);
 
-    fprintf(logsink.f,"%s","Scanning for cells...\n");
+    //fprintf(logsink.f,"%s","Scanning for cells...\n");
     uint32_t ntrial=0; 
     do {
       ret = rf_search_and_decode_mib(&rf, &cell_detect_config, prog_args.force_N_id_2, &cell, &cfo);
@@ -576,7 +582,7 @@ int main(int argc, char **argv) {
 
     printf("\n ret = %d\n", ret);
 
-    fprintf(logsink.f,"Cell with %d PRBs found!", cell.nof_prb);
+    //fprintf(logsink.f,"Cell with %d PRBs found!", cell.nof_prb);
 
 /*
 
@@ -612,7 +618,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Could not set sampling rate\n");
         exit(-1);
       }
-      fprintf(logsink.f,"Setting sampling rate %.2f MHz\n", (float) srate/1000000);
+      //fprintf(logsink.f,"Setting sampling rate %.2f MHz\n", (float) srate/1000000);
     } else {
       fprintf(stderr, "Invalid number of PRB %d\n", cell.nof_prb);
       exit(-1);
@@ -646,7 +652,7 @@ int main(int argc, char **argv) {
       fprintf(stderr, "Error initiating ue_sync\n");
       exit(-1); 
     }
-    fprintf(logsink.f,"UE sync init successful");
+    //fprintf(logsink.f,"UE sync init successful");
 #endif
   }
 
@@ -654,17 +660,17 @@ int main(int argc, char **argv) {
     fprintf(stderr, "Error initaiting UE MIB decoder\n");
     exit(-1);
   }
-  fprintf(logsink.f,"MIB decoder init successful");
+  //fprintf(logsink.f,"MIB decoder init successful");
 
   if (srslte_ue_dl_init(&ue_dl, cell)) {  // This is the User RNTI
     fprintf(stderr, "Error initiating UE downlink processing module\n");
     exit(-1);
   }
-  fprintf(logsink.f,"DL init successful");
+  //fprintf(logsink.f,"DL init successful");
   
   /* Configure downlink receiver for the SI-RNTI since will be the only one we'll use */
   srslte_ue_dl_set_rnti(&ue_dl, prog_args.rnti); 
-  fprintf(logsink.f,"RNTI set successfully");
+  //fprintf(logsink.f,"RNTI set successfully");
   
   /* Initialize subframe counter */
   sf_cnt = 0;
@@ -809,6 +815,8 @@ int main(int argc, char **argv) {
             if (n < 0) {
              // fprintf(stderr, "Error decoding UE DL\n");fflush(stdout);
             } else if (n > 0) {
+              last_noi = srslte_sch_last_noi(&ue_dl.pdsch.dl_sch);
+              hist_iterations[last_noi-1]++;
               
               /* Send data if socket active */
               if (prog_args.net_port > 0) {
@@ -899,7 +907,7 @@ int main(int argc, char **argv) {
 //float srslte_pdsch_average_noi(srslte_pdsch_t *q) 
 printf("BLER=%5.4f, SNR=%5.2f, iterations=%d, percentCPU=%5.2f%, throughput=%d\n", 
         monitor.BLER, monitor.SNR, monitor.iterations, monitor.percentCPU, monitor.throughput_UE);
-//printf("BLER=%5.3f, SNR=%5.3f, ue_dl.pdsch.dl_sch.average_nof_iterations=%d\n", monitor.BLER, monitor.SNR, ue_dl.pdsch.dl_sch.average_nof_iterations);
+printf("BLER=%5.3f, SNR=%5.3f, ue_dl.pdsch.dl_sch.average_nof_iterations=%f\n", monitor.BLER, monitor.SNR, ue_dl.pdsch.dl_sch.average_nof_iterations);
 
 //printf("averpercentCPU=%3.2f\n", averpercentCPU);
 
@@ -984,6 +992,10 @@ printf("BLER=%5.4f, SNR=%5.2f, iterations=%d, percentCPU=%5.2f%, throughput=%d\n
   /* redirect output to stdout */
   if (prog_args.log_file_name) {
     stream = freopen("CON", "w", stdout);
+  }
+
+  for (short j=0; j<10; j++) {
+	  printf("\n %d %d \n", j, hist_iterations[j]);
   }
 
   exit(0);

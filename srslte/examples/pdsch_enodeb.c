@@ -95,7 +95,7 @@ FILE *stream;
 bool null_file_sink=false; 
 srslte_filesink_t fsink;
 srslte_filesource_t fsource; //input data file
-srslte_filesink_t logsink; //log control
+//srslte_filesink_t logsink; //log control
 srslte_ofdm_t ifft;
 srslte_pbch_t pbch;
 srslte_pcfich_t pcfich;
@@ -294,11 +294,12 @@ void base_init() {
   }
 
   /* open log file */
+  /*
   if (srslte_filesink_init(&logsink, "log_enb.txt", SRSLTE_CHAR)) {
 	  fprintf(stderr, "Error opening log file %s\n", "log_enb.txt");
 	  exit(-1);
-  }
-  fprintf(logsink.f,"%s","eNodeB log control\n==================\n\n");
+  }*/
+  //fprintf(logsink.f,"%s","eNodeB log control\n==================\n\n");
 
   if (net_port > 0) {
     if (srslte_netsource_init(&net_source, "0.0.0.0", net_port, SRSLTE_NETSOURCE_TCP)) {
@@ -315,7 +316,7 @@ void base_init() {
       perror("sem_init");
       exit(-1);
     }
-    fprintf(logsink.f,"%s","Sockets init successful\n");
+    //fprintf(logsink.f,"%s","Sockets init successful\n");
   }
 
   /* create ifft object */
@@ -324,54 +325,54 @@ void base_init() {
     exit(-1);
   }
   srslte_ofdm_set_normalize(&ifft, true);
-  fprintf(logsink.f,"%s","iFFT object created successfully (OFDM Tx)\n");
+  //fprintf(logsink.f,"%s","iFFT object created successfully (OFDM Tx)\n");
 
   if (srslte_pbch_init(&pbch, cell)) {
     fprintf(stderr, "Error creating PBCH object\n");
     exit(-1);
   }
-  fprintf(logsink.f,"%s","PBCH created successfully\n");
+  //fprintf(logsink.f,"%s","PBCH created successfully\n");
 
   if (srslte_regs_init(&regs, cell)) {
     fprintf(stderr, "Error initiating regs\n");
     exit(-1);
   }
-  fprintf(logsink.f,"%s","Regs init successful\n");
+  //fprintf(logsink.f,"%s","Regs init successful\n");
 
   if (srslte_pcfich_init(&pcfich, &regs, cell)) {
     fprintf(stderr, "Error creating PCFICH object\n");
     exit(-1);
   }
-  fprintf(logsink.f,"%s","PCFICH created successfully\n");
+  //fprintf(logsink.f,"%s","PCFICH created successfully\n");
 
   if (srslte_regs_set_cfi(&regs, cfi)) {
     fprintf(stderr, "Error setting CFI\n");
     exit(-1);
   }
-  fprintf(logsink.f,"%s","CFI set successfully\n");
+  //fprintf(logsink.f,"%s","CFI set successfully\n");
 
   if (srslte_pdcch_init(&pdcch, &regs, cell)) {
     fprintf(stderr, "Error creating PDCCH object\n");
     exit(-1);
   }
-  fprintf(logsink.f,"%s","PDCCH created successfully\n");
+  //fprintf(logsink.f,"%s","PDCCH created successfully\n");
 
   if (srslte_pdsch_init(&pdsch, cell)) {
     fprintf(stderr, "Error creating PDSCH object\n");
     exit(-1);
   }
-  fprintf(logsink.f,"%s","PDSCH created successfully\n");
+  //fprintf(logsink.f,"%s","PDSCH created successfully\n");
   
   srslte_pdsch_set_rnti(&pdsch, UE_CRNTI);
-  fprintf(logsink.f,"%s","CRNTI set successfully\n");
+  //fprintf(logsink.f,"%s","CRNTI set successfully\n");
   
   if (srslte_softbuffer_tx_init(&softbuffer, cell.nof_prb)) {
     fprintf(stderr, "Error initiating soft buffer\n");
     exit(-1);
   }
-  fprintf(logsink.f,"%s","Soft buffer init successful\n");
-  fprintf(logsink.f,"%s","Base init successful\n");
-  fprintf(logsink.f,"%s","--------------------\n");
+  //fprintf(logsink.f,"%s","Soft buffer init successful\n");
+  //fprintf(logsink.f,"%s","Base init successful\n");
+  //fprintf(logsink.f,"%s","--------------------\n");
 }
 
 void base_free() {
@@ -409,7 +410,7 @@ void base_free() {
   }  
 
   /* free log file */
-  srslte_filesink_free(&logsink);
+  //srslte_filesink_free(&logsink);
 
   /* free input data file */
   if (input_file_name) {
@@ -649,27 +650,27 @@ int main(int argc, char **argv) {
   /* this *must* be called after setting slot_len_* */
   base_init();
 
-  fprintf(logsink.f,"%s","CELL PARAMETERS\n");
-  fprintf(logsink.f,"Cell id: %d\n", cell.id);
-  fprintf(logsink.f,"#PRBs: %d\n", cell.nof_prb);
-  fprintf(logsink.f,"%s","--------------------\n");
+  //fprintf(logsink.f,"%s","CELL PARAMETERS\n");
+  //fprintf(logsink.f,"Cell id: %d\n", cell.id);
+  //fprintf(logsink.f,"#PRBs: %d\n", cell.nof_prb);
+  //fprintf(logsink.f,"%s","--------------------\n");
 
   /* Generate PSS/SSS signals */
   if (srslte_pss_generate(pss_signal, N_id_2)) {
     fprintf(stderr, "Error generating PSS signal\n");
     exit(-1);
   }
-  fprintf(logsink.f,"PSS signal generated successfully\n");
+ // fprintf(logsink.f,"PSS signal generated successfully\n");
 
   srslte_sss_generate(sss_signal0, sss_signal5, cell.id);
-  fprintf(logsink.f,"SSS signals generated successfully\n");
+  //fprintf(logsink.f,"SSS signals generated successfully\n");
   
   /* Generate CRS signals */
   if (srslte_chest_dl_init(&est, cell)) {
     fprintf(stderr, "Error initializing equalizer\n");
     exit(-1);
   }
-  fprintf(logsink.f,"Channel equalizer init successful\n");
+  //fprintf(logsink.f,"Channel equalizer init successful\n");
 
   for (i = 0; i < SRSLTE_MAX_PORTS; i++) { // now there's only 1 port
     sf_symbols[i] = sf_buffer;
@@ -700,7 +701,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Could not set sampling rate\n");
         exit(-1);
       }
-      fprintf(logsink.f, "Setting sampling rate %.2f MHz\n", (float) srate/1000000);
+      //fprintf(logsink.f, "Setting sampling rate %.2f MHz\n", (float) srate/1000000);
     } else {
       fprintf(stderr, "Invalid number of PRB %d\n", cell.nof_prb);
       exit(-1);
@@ -708,22 +709,22 @@ int main(int argc, char **argv) {
     printf("Set TX gain: %.1f dB\n", srslte_rf_set_tx_gain(&rf, rf_gain));
     printf("Set TX freq: %.2f MHz\n",
         srslte_rf_set_tx_freq(&rf, rf_freq) / 1000000);
-    fprintf(logsink.f, "Setting Tx gain: %.1f dB\n", rf_gain);
-    fprintf(logsink.f, "Setting Tx freq: %.2f MHz\n", (float) rf_freq / 1000000);
+    //fprintf(logsink.f, "Setting Tx gain: %.1f dB\n", rf_gain);
+    //fprintf(logsink.f, "Setting Tx freq: %.2f MHz\n", (float) rf_freq / 1000000);
   }
 #endif
 
   if (update_radl(sf_idx)) {
     exit(-1);
   }
-  fprintf(logsink.f, "Updated DL resource allocation");
+  //fprintf(logsink.f, "Updated DL resource allocation");
   
   if (net_port > 0) {
     if (pthread_create(&net_thread, NULL, net_thread_fnc, NULL)) {
       perror("pthread_create");
       exit(-1);
     }
-    fprintf(logsink.f, "Thread for UDP socket created");
+    //fprintf(logsink.f, "Thread for UDP socket created");
   }
 
   /* Initiate valid DCI locations */
@@ -879,8 +880,8 @@ int main(int argc, char **argv) {
 
 		  //correct noise level according expected SNR. SNR=Psignal/(Gain*Pnoise)
 		  gain=sqrt(signal_power/(SNR*noise_power));
-		  /*printf("Noise channel: SNR_lineal=%1.1f, signal_power=%1.6f W, noise_power=%1.6f, gain=%1.6f \n",
-						SNR, signal_power, noise_power, gain);*/
+		  //printf("Noise channel: SNR_lineal=%1.1f, signal_power=%1.6f W, noise_power=%1.6f, gain=%1.6f \n",
+						//SNR, signal_power, noise_power, gain);
 
 		  //add noise
 		  for(i=0; i<sf_n_samples; i++){
